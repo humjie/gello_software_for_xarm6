@@ -1,3 +1,8 @@
+## Based On
+This project is based on [gello_software](https://github.com/wuphilipp/gello_software), which was modified for adding ufactory xarm6.
+Original repository by [@wuphilipp](https://github.com/wuphilipp).
+
+
 # GELLO
 This is the central repo that holds the all the software for GELLO. See the website for the paper and other resources for GELLO https://wuphilipp.github.io/gello_site/
 See the GELLO hardware repo for the STL files and hardware instructions for building your own GELLO https://github.com/wuphilipp/gello_mechanical
