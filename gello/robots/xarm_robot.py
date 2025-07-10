@@ -61,7 +61,6 @@ class RobotState:
     j4: float
     j5: float
     j6: float
-    j7: float
     aa: np.ndarray
 
     @staticmethod
@@ -82,7 +81,6 @@ class RobotState:
             joints[3],
             joints[4],
             joints[5],
-            joints[6],
             aa,
         )
 
@@ -93,7 +91,7 @@ class RobotState:
         return _quat_from_aa(self.aa)
 
     def joints(self) -> np.ndarray:
-        return np.array([self.j1, self.j2, self.j3, self.j4, self.j5, self.j6, self.j7])
+        return np.array([self.j1, self.j2, self.j3, self.j4, self.j5, self.j6])
 
     def gripper_pos(self) -> float:
         return self.gripper
@@ -117,41 +115,51 @@ class Rate:
 
 
 class XArmRobot(Robot):
-
     GRIPPER_OPEN = 800
     GRIPPER_CLOSE = 0
+    #  MAX_DELTA = 0.2
     DEFAULT_MAX_DELTA = 0.05
+
+    def num_dofs(self) -> int:
+        return 7
+
+    def get_joint_state(self) -> np.ndarray:
+        state = self.get_state()
+        gripper = state.gripper_pos()
+        all_dofs = np.concatenate([state.joints(), np.array([gripper])])
+        return all_dofs
+
+    def command_joint_state(self, joint_state: np.ndarray) -> None:
+        if len(joint_state) == 6:
+            self.set_command(joint_state, None)
+        elif len(joint_state) == 7:
+            self.set_command(joint_state[:7], joint_state[7])
+        else:
+            raise ValueError(
+                f"Invalid joint state: {joint_state}, len={len(joint_state)}"
+            )
+
+    def stop(self):
+        self.running = False
+        if self.robot is not None:
+            self.robot.disconnect()
+
+        if self.command_thread is not None:
+            self.command_thread.join()
 
     def __init__(
         self,
-        ip: str = "192.168.1.226",
+        ip: str = "192.168.1.221",
         real: bool = True,
         control_frequency: float = 50.0,
         max_delta: float = DEFAULT_MAX_DELTA,
-        model: str = "xarm6",  # "xarm6" or "xarm7"
     ):
-        print(f"Connecting to {model} at {ip}")
+        print(ip)
         self.real = real
         self.max_delta = max_delta
-        self.model = model
-        
-        # Define joint mapping for xArm6: hardware motor index -> simulation joint index
-        # This maps hardware motors 0-5 to simulation joints 1-6 in the correct order
-        if self.model == "xarm6":
-            # Hardware motors 0-5 map to simulation joints in this order:
-            # Motor 0 -> Joint 1 (base rotation)
-            # Motor 1 -> Joint 2 (shoulder)  
-            # Motor 2 -> Joint 3 (elbow)
-            # Motor 3 -> Joint 4 (wrist1)
-            # Motor 4 -> Joint 5 (wrist2)
-            # Motor 5 -> Joint 6 (wrist3)
-            self.hw_to_sim_joint_map = [0, 1, 2, 3, 4, 5]  # Direct mapping for now
-            self.sim_to_hw_joint_map = [0, 1, 2, 3, 4, 5]  # Inverse mapping
-        else:
-            self.hw_to_sim_joint_map = list(range(7))  # xArm7 direct mapping
-            self.sim_to_hw_joint_map = list(range(7))
         if real:
             from xarm.wrapper import XArmAPI
+
             self.robot = XArmAPI(ip, is_radian=True)
         else:
             self.robot = None
@@ -172,88 +180,6 @@ class XArmRobot(Robot):
         if real:
             self.command_thread = threading.Thread(target=self._robot_thread)
             self.command_thread.start()
-
-    def set_joint_mapping(self, hw_to_sim_map: list):
-        """Set custom joint mapping from hardware to simulation order.
-        
-        Args:
-            hw_to_sim_map: List where hw_to_sim_map[i] is the hardware joint index
-                          that corresponds to simulation joint i
-        """
-        if self.model == "xarm6" and len(hw_to_sim_map) != 6:
-            raise ValueError(f"xArm6 requires 6 joint mappings, got {len(hw_to_sim_map)}")
-        elif self.model == "xarm7" and len(hw_to_sim_map) != 7:
-            raise ValueError(f"xArm7 requires 7 joint mappings, got {len(hw_to_sim_map)}")
-            
-        self.hw_to_sim_joint_map = hw_to_sim_map
-        self.sim_to_hw_joint_map = [0] * len(hw_to_sim_map)
-        for sim_idx, hw_idx in enumerate(hw_to_sim_map):
-            self.sim_to_hw_joint_map[hw_idx] = sim_idx
-        
-        print(f"Updated joint mapping - HW to Sim: {self.hw_to_sim_joint_map}")
-        print(f"Updated joint mapping - Sim to HW: {self.sim_to_hw_joint_map}")
-
-    def num_dofs(self) -> int:
-        if self.model == "xarm6":
-            return 7  # 6 joints + gripper
-        else:
-            return 8  # 7 joints + gripper
-
-    def get_joint_state(self) -> np.ndarray:
-        state = self.get_state()
-        gripper = state.gripper_pos()
-        if self.model == "xarm6":
-            # Get hardware joint angles (6 joints)
-            hw_joints = state.joints()[:6]  # Get first 6 joints from hardware
-            
-            # Map hardware joints to simulation order
-            sim_joints = np.zeros(6)
-            for i, hw_idx in enumerate(self.hw_to_sim_joint_map):
-                sim_joints[i] = hw_joints[hw_idx]
-            
-            # Return simulation-ordered joints + gripper
-            all_dofs = np.concatenate([sim_joints, np.array([gripper])])
-            return all_dofs
-        else:
-            # xArm7 - direct mapping
-            all_dofs = np.concatenate([state.joints(), np.array([gripper])])
-            return all_dofs
-
-    def command_joint_state(self, joint_state: np.ndarray) -> None:
-        if self.model == "xarm6":
-            if len(joint_state) == 6:
-                # Map simulation joints to hardware order
-                hw_joints = np.zeros(6)
-                for i, sim_idx in enumerate(self.sim_to_hw_joint_map):
-                    hw_joints[sim_idx] = joint_state[i]
-                self.set_command(hw_joints, None)
-            elif len(joint_state) == 7:
-                # Last is gripper - map first 6 joints to hardware order
-                sim_joints = joint_state[:6]
-                hw_joints = np.zeros(6)
-                for i, sim_idx in enumerate(self.sim_to_hw_joint_map):
-                    hw_joints[sim_idx] = sim_joints[i]
-                self.set_command(hw_joints, joint_state[6])
-            else:
-                raise ValueError(f"Invalid joint state for xarm6: {joint_state}, len={len(joint_state)}")
-        else:
-            # xArm7 - direct mapping
-            if len(joint_state) == 7:
-                self.set_command(joint_state, None)
-            elif len(joint_state) == 8:
-                self.set_command(joint_state[:7], joint_state[7])
-            else:
-                raise ValueError(
-                    f"Invalid joint state: {joint_state}, len={len(joint_state)}"
-                )
-
-    def stop(self):
-        self.running = False
-        if self.robot is not None:
-            self.robot.disconnect()
-
-        if self.command_thread is not None:
-            self.command_thread.join()
 
     def get_state(self) -> RobotState:
         with self.last_state_lock:
@@ -283,7 +209,7 @@ class XArmRobot(Robot):
         time.sleep(1)
         self.robot.set_gripper_mode(0)
         time.sleep(1)
-        self.robot.set_gripper_speed(3000)
+        self.robot.set_gripper_speed(100)
         time.sleep(1)
 
     def _get_gripper_pos(self) -> float:
@@ -320,13 +246,12 @@ class XArmRobot(Robot):
             s_t = time.time()
             # update last state
             self.last_state = self._update_last_state()
-            print("Last state:", self.last_state)
             with self.target_command_lock:
                 joint_delta = np.array(
                     self.target_command["joints"] - self.last_state.joints()
                 )
                 gripper_command = self.target_command["gripper"]
-                print("Gripper command:", gripper_command)
+
             norm = np.linalg.norm(joint_delta)
 
             # threshold delta to be at most 0.01 in norm space
@@ -363,7 +288,7 @@ class XArmRobot(Robot):
     def _update_last_state(self) -> RobotState:
         with self.last_state_lock:
             if self.robot is None:
-                return RobotState(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, np.zeros(3))
+                return RobotState(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, np.zeros(3))
 
             gripper_pos = self._get_gripper_pos()
 
@@ -383,24 +308,12 @@ class XArmRobot(Robot):
             aa = cart_pos[3:]
             cart_pos[:3] /= 1000
 
-            if self.model == "xarm6":
-                # Use first 6 joints for xarm6
-                sa = np.array(servo_angle)
-                sa6 = np.zeros(6)
-                sa6[0:6] = sa[0:6]
-                return RobotState.from_robot(
-                    cart_pos,
-                    np.concatenate([sa6, [0]]),  # pad to 7 for RobotState dataclass
-                    gripper_pos,
-                    aa,
-                )
-            else:
-                return RobotState.from_robot(
-                    cart_pos,
-                    servo_angle,
-                    gripper_pos,
-                    aa,
-                )
+            return RobotState.from_robot(
+                cart_pos,
+                servo_angle,
+                gripper_pos,
+                aa,
+            )
 
     def _set_position(
         self,
@@ -426,7 +339,7 @@ class XArmRobot(Robot):
 
 
 def main():
-    ip = "192.168.1.226"
+    ip = "192.168.1.221"
     robot = XArmRobot(ip)
     import time
 

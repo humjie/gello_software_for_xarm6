@@ -70,25 +70,23 @@
                   <geom name="xarm6//unnamed_geom_5" mesh="xarm6/link5"/>
                   <body name="xarm6/link6" quat="1 -1 0 0">
                     <inertial pos="0.075999999999999998 0.097000000000000003 0" quat="-0.217672 0.77241899999999997 0.16258 0.57406900000000005" mass="0.17000000000000001" diaginertia="0.0024542100000000001 0.00221646 0.00107273"/>
-                    <joint name="xarm6/joint6" class="xarm6/size3" range="-6.2831799999999998 6.2831799999999998"/>
-                    <geom name="xarm6//unnamed_geom_6" mesh="xarm6/link6"/>
-                    <body name="xarm6/bio_gripper_base_link" pos="0 0 0" quat="1 0 0 0">
+                    <joint name="xarm6/joint6" class="xarm6/size3" pos="0.075999999999999998 0 0" range="-6.2831799999999998 6.2831799999999998"/>
+                    <geom name="xarm6//unnamed_geom_6" material="xarm6/gray" pos="0.075999999999999998 0 0.096000000000000002" mesh="xarm6/end_tool"/>
+                    <body name="xarm6/bio_gripper_base_link" pos="0.075999999999999998 0 0.096000000000000002" quat="1 0 0 0">
                       <inertial pos="0.016178999999999999 -2.3910999999999999e-05 0.023897000000000002" quat="1 0 0 0" mass="0.38836999999999999" diaginertia="0.00088398000000000003 0.00018255999999999999 0.00094673000000000001"/>
-                      <body name="xarm6/visual_offset" pos="0.075999999999999998 0 0.069000000000000006">
-                        <geom name="xarm6//unnamed_geom_7" mesh="xarm6/link_base_bio_gripper"/>
-                        <body name="xarm6/left_finger" pos="0.058999999999999997 0 0.027">
-                          <inertial pos="0.021846000000000001 -0.0276 0.011911" quat="1 0 0 0" mass="0.012104999999999999" diaginertia="3.7322e-06 1.7439999999999999e-05 1.7774999999999998e-05"/>
-                          <joint name="xarm6/left_finger_joint" class="xarm6/follower" type="slide" axis="0 1 0" range="0 0.20000000000000001"/>
-                          <geom name="xarm6//unnamed_geom_8" material="xarm6/white" mesh="xarm6/left_finger"/>
-                        </body>
-                        <body name="xarm6/right_finger" pos="0.058999999999999997 0 0.027">
-                          <inertial pos="0.020369999999999999 0.027564999999999999 0.010274" quat="1 0 0 0" mass="0.012068000000000001" diaginertia="4.1412999999999996e-06 1.6115000000000001e-05 1.6032000000000002e-05"/>
-                          <joint name="xarm6/right_finger_joint" class="xarm6/follower" type="slide" axis="0 -1 0" range="-0.20000000000000001 0"/>
-                          <geom name="xarm6//unnamed_geom_9" material="xarm6/white" mesh="xarm6/right_finger"/>
-                        </body>
-                        <body name="xarm6/link_tcp" pos="0.13500000000000001 0 0.055">
-                          <site name="xarm6/tcp" size="0.001" pos="0 0 0"/>
-                        </body>
+                      <geom name="xarm6//unnamed_geom_7" pos="0 0 0" mesh="xarm6/link_base_bio_gripper"/>
+                      <body name="xarm6/left_finger" pos="0.058999999999999997 -0.040000000000000001 0.027">
+                        <inertial pos="0.021846000000000001 -0.0276 0.011911" quat="1 0 0 0" mass="0.012104999999999999" diaginertia="3.7322e-06 1.7439999999999999e-05 1.7774999999999998e-05"/>
+                        <joint name="xarm6/left_finger_joint" class="xarm6/follower" type="slide" axis="0 1 0" range="0 0.040000000000000001"/>
+                        <geom name="xarm6//unnamed_geom_8" material="xarm6/white" mesh="xarm6/left_finger"/>
+                      </body>
+                      <body name="xarm6/right_finger" pos="0.058999999999999997 0.040000000000000001 0.027">
+                        <inertial pos="0.020369999999999999 0.027564999999999999 0.010274" quat="1 0 0 0" mass="0.012068000000000001" diaginertia="4.1412999999999996e-06 1.6115000000000001e-05 1.6032000000000002e-05"/>
+                        <joint name="xarm6/right_finger_joint" class="xarm6/follower" type="slide" axis="0 -1 0" range="0 0.040000000000000001"/>
+                        <geom name="xarm6//unnamed_geom_9" material="xarm6/white" mesh="xarm6/right_finger"/>
+                      </body>
+                      <body name="xarm6/link_tcp" pos="0.13500000000000001 0 0.055">
+                        <site name="xarm6/tcp" size="0.001" pos="0 0 0"/>
                       </body>
                     </body>
                   </body>

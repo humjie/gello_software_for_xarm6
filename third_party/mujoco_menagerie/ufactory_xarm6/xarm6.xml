@@ -68,25 +68,23 @@
                 <geom mesh="link5"/>
                 <body name="link6" quat="1 -1 0 0">
                   <inertial pos="0.076 0.097 0" quat="-0.217672 0.772419 0.16258 0.574069" mass="0.17" diaginertia="0.00245421 0.00221646 0.00107273"/>
-                  <joint name="joint6" range="-6.28318 6.28318" class="size3"/>
-                  <geom mesh="link6"/>
-                  <body name="bio_gripper_base_link" pos="0 0 0" quat="1 0 0 0">
-                    <body name="visual_offset" pos="0.076 0 0.069">
-                      <inertial pos="0.016179 -2.3911e-05 0.023897" quat="1 0 0 0" mass="0.38837" diaginertia="0.00088398 0.00018256 0.00094673"/>
-                      <geom mesh="link_base_bio_gripper"/>
-                      <body name="left_finger" pos="0.059 0 0.027">
-                        <inertial pos="0.021846 -0.0276 0.011911" quat="1 0 0 0" mass="0.012105" diaginertia="3.7322e-06 1.744e-05 1.7775e-05"/>
-                        <joint name="left_finger_joint" type="slide" axis="0 1 0" range="0 0.2" class="follower"/>
-                        <geom material="white" mesh="left_finger"/>
-                      </body>
-                      <body name="right_finger" pos="0.059 0 0.027">
-                        <inertial pos="0.02037 0.027565 0.010274" quat="1 0 0 0" mass="0.012068" diaginertia="4.1413e-06 1.6115e-05 1.6032e-05"/>
-                        <joint name="right_finger_joint" type="slide" axis="0 -1 0" range="-0.2 0" class="follower"/>
-                        <geom material="white" mesh="right_finger"/>
-                      </body>
-                      <body name="link_tcp" pos="0.135 0 0.055">
-                        <site name="tcp" pos="0 0 0" size="0.001"/>
-                      </body>
+                  <joint name="joint6" pos="0.076 0 0" range="-6.28318 6.28318" class="size3"/>
+                  <geom material="gray" mesh="end_tool" pos="0.076 0 0.096"/>
+                  <body name="bio_gripper_base_link" pos="0.076 0 0.096" quat="1 0 0 0">
+                    <inertial pos="0.016179 -2.3911e-05 0.023897" quat="1 0 0 0" mass="0.38837" diaginertia="0.00088398 0.00018256 0.00094673"/>
+                    <geom mesh="link_base_bio_gripper" pos="0 0 0"/>
+                    <body name="left_finger" pos="0.059 -0.04 0.027">
+                      <inertial pos="0.021846 -0.0276 0.011911" quat="1 0 0 0" mass="0.012105" diaginertia="3.7322e-06 1.744e-05 1.7775e-05"/>
+                      <joint name="left_finger_joint" type="slide" axis="0 1 0" range="0 0.04" class="follower"/>
+                      <geom material="white" mesh="left_finger"/>
+                    </body>
+                    <body name="right_finger" pos="0.059 0.04 0.027">
+                      <inertial pos="0.02037 0.027565 0.010274" quat="1 0 0 0" mass="0.012068" diaginertia="4.1413e-06 1.6115e-05 1.6032e-05"/>
+                      <joint name="right_finger_joint" type="slide" axis="0 -1 0" range="0 0.04" class="follower"/>
+                      <geom material="white" mesh="right_finger"/>
+                    </body>
+                    <body name="link_tcp" pos="0.135 0 0.055">
+                      <site name="tcp" pos="0 0 0" size="0.001"/>
                     </body>
                   </body>
                 </body>

@@ -167,7 +167,7 @@ def main(args):
             print(
                 f"joint[{i}]: \t delta: {delta:4.3f} , leader: \t{joint:4.3f} , follower: \t{current_j:4.3f}"
             )
-        #return
+        return
         # Always continue, do not return or exit here
 
     print(f"Start pos: {len(start_pos)}", f"Joints: {len(joints)}")
@@ -198,7 +198,7 @@ def main(args):
             print(
                 f"Joint [{j}], leader: {action[j]}, follower: {joints[j]}, diff: {action[j] - joints[j]}"
             )
-        #exit()
+        exit()
 
     if args.use_save_interface:
         from gello.data_utils.keyboard_interface import KBReset
