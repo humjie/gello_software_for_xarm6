@@ -1,3 +1,4 @@
-_NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia python experiments/launch_nodes.py --robot sim_xarm6
+env _NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia python experiments/launch_nodes.py --robot sim_xarm6
 
-env _NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia xvfb-run -s "-screen 0 1400x900x24" python experiments/launch_nodes.py --robot sim_xarm6
+python experiments/run_env.py --agent=gello
+

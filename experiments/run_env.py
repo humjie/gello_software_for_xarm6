@@ -45,7 +45,7 @@ class Args:
 
 def main(args):
     if args.mock:
-        robot_client = PrintRobot(8, dont_print=True)
+        robot_client = PrintRobot(7, dont_print=True)
         camera_clients = {}
     else:
         camera_clients = {
@@ -116,8 +116,8 @@ def main(args):
                         "No gello port found, please specify one or plug in gello"
                     )
             if args.start_joints is None:
-                reset_joints = np.deg2rad(
-                    [0, -90, 90, -90, -90, 0, 0]
+                reset_joints = np.array(
+                    [0, 0.00576, 0.00498, 0, 0.00154, 0.000737, 0]  # 6 arm + 1 gripper
                 )  # Change this to your own reset joints
             else:
                 reset_joints = args.start_joints
@@ -157,7 +157,6 @@ def main(args):
     max_joint_delta = 0.8
     if abs_deltas[id_max_joint_delta] > max_joint_delta:
         id_mask = abs_deltas > max_joint_delta
-        print()
         ids = np.arange(len(id_mask))[id_mask]
         for i, delta, joint, current_j in zip(
             ids,

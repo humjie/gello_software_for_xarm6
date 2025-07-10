@@ -81,9 +81,8 @@ class PrintRobot(Robot):
             "joint_positions": joint_state,
             "joint_velocities": joint_state,
             "ee_pos_quat": pos_quat,
-            "gripper_position": np.array(0),
+            "gripper_position": np.array([0]),
         }
-
 
 class BimanualRobot(Robot):
     def __init__(self, robot_l: Robot, robot_r: Robot):

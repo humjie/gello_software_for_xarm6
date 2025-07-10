@@ -19,11 +19,11 @@ class Args:
     port: str = "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTAAMN19-if00-port0"
     """The port that GELLO is connected to."""
 
-    start_joints: Tuple[float, ...] = (0, 0, 0, 0, 0, 0)
-    """The joint angles that the GELLO is placed in at (in radians)."""
+    start_joints: Tuple[float, ...] = (0, 0.00576, 0.00498, 0, 0.00154, 0.000737)
+    """The joint angles that the GELLO is placed in at (in radians) - 6 arm + 1 gripper."""
 
     joint_signs: Tuple[float, ...] = (1, 1, 1, 1, 1, 1)
-    """The joint angles that the GELLO is placed in at (in radians)."""
+    """The joint signs that the GELLO is placed in at (in radians) - 6 arm + 1 gripper."""
 
     gripper: bool = True
     """Whether or not the gripper is attached."""
@@ -47,6 +47,7 @@ class Args:
 
 def get_config(args: Args) -> None:
     joint_ids = list(range(args.num_joints))
+    print("joint_ids: ", joint_ids)
     driver = DynamixelDriver(joint_ids, port=args.port, baudrate=57600)
 
     # assume that the joint state shouold be args.start_joints

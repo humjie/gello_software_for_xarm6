@@ -75,17 +75,17 @@ PORT_CONFIG_MAP: Dict[str, DynamixelRobotConfig] = {
         gripper_config=(6, 195, 152),
     ),
     "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTAAMN19-if00-port0": DynamixelRobotConfig(
-        joint_ids=(0, 1, 2, 3, 4, 5),
+        joint_ids=(0, 1, 2, 3, 4, 5),  # 6 arm joints
         joint_offsets=(
-            5 * np.pi / 2,   # joint 1 (same as xarm7)
-            2 * np.pi / 2,   # joint 2 (same as xarm7)
-            2 * np.pi / 2,   # joint 3 (xarm6, mapped from joint 4 of xarm7, range -225°~11°)
-            2 * np.pi / 2,   # joint 4 (xarm6, mapped from joint 5 of xarm7)
-            2 * np.pi / 2,   # joint 5 (xarm6, mapped from joint 6 of xarm7)
-            4 * np.pi / 2,   # joint 6 (xarm6, mapped from joint 7 of xarm7)
+            1 * np.pi / 2,   # 7.854
+            2 * np.pi / 2,   # 3.142
+            3 * np.pi / 2,   # 3.142
+            2 * np.pi / 2,   # 3.142
+            0 * np.pi / 2,   # 3.142
+            1 * np.pi / 2,   # 4.712
         ),
-        joint_signs=(1, 1, 1, 1, 1, 1),
-        gripper_config=(6, 198, 156),
+        joint_signs=(1, 1, 1, 1, 1, 1),  # 6 arm
+        gripper_config=(6, 156.6328125, 198.4328125),  # Gripper
     ),
     # Left UR
     "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT7WBEIA-if00-port0": DynamixelRobotConfig(
@@ -138,14 +138,27 @@ class GelloAgent(Agent):
 
     def act(self, obs: Dict[str, np.ndarray]) -> np.ndarray:
         return self._robot.get_joint_state()
+        '''
+        print(f"Current joint state: {dyna_joints}")
+        if len(dyna_joints) == 6:
+            # Only arm joints, add gripper
+            gripper_pos = self._robot._get_gripper_pos()
+            print(f"Gripper position: {gripper_pos}")
+            return np.concatenate([dyna_joints, [gripper_pos]])
+        else:
+            # Already includes gripper
+            return dyna_joints
+        
+        
+        return self._robot.get_joint_state()
         dyna_joints = self._robot.get_joint_state()
         # current_q = dyna_joints[:-1]  # last one dim is the gripper
         current_gripper = dyna_joints[-1]  # last one dim is the gripper
-
+        
         print(current_gripper)
         if current_gripper < 0.2:
             self._robot.set_torque_mode(False)
             return obs["joint_positions"]
         else:
             self._robot.set_torque_mode(False)
-            return dyna_joints
+            return dyna_joints'''

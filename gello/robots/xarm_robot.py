@@ -128,12 +128,28 @@ class XArmRobot(Robot):
         real: bool = True,
         control_frequency: float = 50.0,
         max_delta: float = DEFAULT_MAX_DELTA,
-        model: str = "xarm7",  # "xarm6" or "xarm7"
+        model: str = "xarm6",  # "xarm6" or "xarm7"
     ):
         print(f"Connecting to {model} at {ip}")
         self.real = real
         self.max_delta = max_delta
         self.model = model
+        
+        # Define joint mapping for xArm6: hardware motor index -> simulation joint index
+        # This maps hardware motors 0-5 to simulation joints 1-6 in the correct order
+        if self.model == "xarm6":
+            # Hardware motors 0-5 map to simulation joints in this order:
+            # Motor 0 -> Joint 1 (base rotation)
+            # Motor 1 -> Joint 2 (shoulder)  
+            # Motor 2 -> Joint 3 (elbow)
+            # Motor 3 -> Joint 4 (wrist1)
+            # Motor 4 -> Joint 5 (wrist2)
+            # Motor 5 -> Joint 6 (wrist3)
+            self.hw_to_sim_joint_map = [0, 1, 2, 3, 4, 5]  # Direct mapping for now
+            self.sim_to_hw_joint_map = [0, 1, 2, 3, 4, 5]  # Inverse mapping
+        else:
+            self.hw_to_sim_joint_map = list(range(7))  # xArm7 direct mapping
+            self.sim_to_hw_joint_map = list(range(7))
         if real:
             from xarm.wrapper import XArmAPI
             self.robot = XArmAPI(ip, is_radian=True)
@@ -157,6 +173,26 @@ class XArmRobot(Robot):
             self.command_thread = threading.Thread(target=self._robot_thread)
             self.command_thread.start()
 
+    def set_joint_mapping(self, hw_to_sim_map: list):
+        """Set custom joint mapping from hardware to simulation order.
+        
+        Args:
+            hw_to_sim_map: List where hw_to_sim_map[i] is the hardware joint index
+                          that corresponds to simulation joint i
+        """
+        if self.model == "xarm6" and len(hw_to_sim_map) != 6:
+            raise ValueError(f"xArm6 requires 6 joint mappings, got {len(hw_to_sim_map)}")
+        elif self.model == "xarm7" and len(hw_to_sim_map) != 7:
+            raise ValueError(f"xArm7 requires 7 joint mappings, got {len(hw_to_sim_map)}")
+            
+        self.hw_to_sim_joint_map = hw_to_sim_map
+        self.sim_to_hw_joint_map = [0] * len(hw_to_sim_map)
+        for sim_idx, hw_idx in enumerate(hw_to_sim_map):
+            self.sim_to_hw_joint_map[hw_idx] = sim_idx
+        
+        print(f"Updated joint mapping - HW to Sim: {self.hw_to_sim_joint_map}")
+        print(f"Updated joint mapping - Sim to HW: {self.sim_to_hw_joint_map}")
+
     def num_dofs(self) -> int:
         if self.model == "xarm6":
             return 7  # 6 joints + gripper
@@ -167,46 +203,41 @@ class XArmRobot(Robot):
         state = self.get_state()
         gripper = state.gripper_pos()
         if self.model == "xarm6":
-            # Map xarm7 joints to xarm6 as per user mapping
-            j = state.joints()
-            # xarm6: [j1, j2, j4, j5, j6, j7] from xarm7: [j1, j2, j4, j5, j6, j7]
-            # j3 of xarm6 = j4 of xarm7, j4,5,6 of xarm6 = j5,6,7 of xarm7
-            xarm6_joints = np.array([j[0], j[1], j[3], j[4], j[5], j[6]])
-            all_dofs = np.concatenate([xarm6_joints, np.array([gripper])])
+            # Get hardware joint angles (6 joints)
+            hw_joints = state.joints()[:6]  # Get first 6 joints from hardware
+            
+            # Map hardware joints to simulation order
+            sim_joints = np.zeros(6)
+            for i, hw_idx in enumerate(self.hw_to_sim_joint_map):
+                sim_joints[i] = hw_joints[hw_idx]
+            
+            # Return simulation-ordered joints + gripper
+            all_dofs = np.concatenate([sim_joints, np.array([gripper])])
             return all_dofs
         else:
+            # xArm7 - direct mapping
             all_dofs = np.concatenate([state.joints(), np.array([gripper])])
             return all_dofs
 
     def command_joint_state(self, joint_state: np.ndarray) -> None:
         if self.model == "xarm6":
             if len(joint_state) == 6:
-                # Map xarm6 joint state to xarm7 for command
-                # xarm6: [j1, j2, j3, j4, j5, j6]
-                # xarm7: [j1, j2, SKIP, j3, j4, j5, j6]
-                j7_state = np.zeros(7)
-                j7_state[0] = joint_state[0]
-                j7_state[1] = joint_state[1]
-                # j7_state[2] = 0  # skip j3
-                j7_state[3] = joint_state[2]  # xarm6 j3 -> xarm7 j4
-                j7_state[4] = joint_state[3]  # xarm6 j4 -> xarm7 j5
-                j7_state[5] = joint_state[4]  # xarm6 j5 -> xarm7 j6
-                j7_state[6] = joint_state[5]  # xarm6 j6 -> xarm7 j7
-                self.set_command(j7_state, None)
+                # Map simulation joints to hardware order
+                hw_joints = np.zeros(6)
+                for i, sim_idx in enumerate(self.sim_to_hw_joint_map):
+                    hw_joints[sim_idx] = joint_state[i]
+                self.set_command(hw_joints, None)
             elif len(joint_state) == 7:
-                # last is gripper
-                j7_state = np.zeros(7)
-                j7_state[0] = joint_state[0]
-                j7_state[1] = joint_state[1]
-                # j7_state[2] = 0
-                j7_state[3] = joint_state[2]
-                j7_state[4] = joint_state[3]
-                j7_state[5] = joint_state[4]
-                j7_state[6] = joint_state[5]
-                self.set_command(j7_state, joint_state[6])
+                # Last is gripper - map first 6 joints to hardware order
+                sim_joints = joint_state[:6]
+                hw_joints = np.zeros(6)
+                for i, sim_idx in enumerate(self.sim_to_hw_joint_map):
+                    hw_joints[sim_idx] = sim_joints[i]
+                self.set_command(hw_joints, joint_state[6])
             else:
                 raise ValueError(f"Invalid joint state for xarm6: {joint_state}, len={len(joint_state)}")
         else:
+            # xArm7 - direct mapping
             if len(joint_state) == 7:
                 self.set_command(joint_state, None)
             elif len(joint_state) == 8:
@@ -223,40 +254,6 @@ class XArmRobot(Robot):
 
         if self.command_thread is not None:
             self.command_thread.join()
-
-    def __init__(
-        self,
-        ip: str = "192.168.1.226",
-        real: bool = True,
-        control_frequency: float = 50.0,
-        max_delta: float = DEFAULT_MAX_DELTA,
-    ):
-        print(ip)
-        self.real = real
-        self.max_delta = max_delta
-        if real:
-            from xarm.wrapper import XArmAPI
-
-            self.robot = XArmAPI(ip, is_radian=True)
-        else:
-            self.robot = None
-
-        self._control_frequency = control_frequency
-        self._clear_error_states()
-        self._set_gripper_position(self.GRIPPER_OPEN)
-
-        self.last_state_lock = threading.Lock()
-        self.target_command_lock = threading.Lock()
-        self.last_state = self._update_last_state()
-        self.target_command = {
-            "joints": self.last_state.joints(),
-            "gripper": 0,
-        }
-        self.running = True
-        self.command_thread = None
-        if real:
-            self.command_thread = threading.Thread(target=self._robot_thread)
-            self.command_thread.start()
 
     def get_state(self) -> RobotState:
         with self.last_state_lock:
@@ -323,12 +320,13 @@ class XArmRobot(Robot):
             s_t = time.time()
             # update last state
             self.last_state = self._update_last_state()
+            print("Last state:", self.last_state)
             with self.target_command_lock:
                 joint_delta = np.array(
                     self.target_command["joints"] - self.last_state.joints()
                 )
                 gripper_command = self.target_command["gripper"]
-
+                print("Gripper command:", gripper_command)
             norm = np.linalg.norm(joint_delta)
 
             # threshold delta to be at most 0.01 in norm space
@@ -385,23 +383,14 @@ class XArmRobot(Robot):
             aa = cart_pos[3:]
             cart_pos[:3] /= 1000
 
-            # For xarm6, fill in the joint mapping as per user description
             if self.model == "xarm6":
-                # servo_angle: [j1, j2, j3, j4, j5, j6, j7] (xarm7 convention)
-                # xarm6: [j1, j2, j4, j5, j6, j7] (skip j3)
-                # We'll keep the RobotState as 7 joints for compatibility, but set j3=0
+                # Use first 6 joints for xarm6
                 sa = np.array(servo_angle)
-                sa6 = np.zeros(7)
-                sa6[0] = sa[0]
-                sa6[1] = sa[1]
-                sa6[2] = 0  # skipped
-                sa6[3] = sa[3]  # xarm6 j3
-                sa6[4] = sa[4]
-                sa6[5] = sa[5]
-                sa6[6] = sa[6]
+                sa6 = np.zeros(6)
+                sa6[0:6] = sa[0:6]
                 return RobotState.from_robot(
                     cart_pos,
-                    sa6,
+                    np.concatenate([sa6, [0]]),  # pad to 7 for RobotState dataclass
                     gripper_pos,
                     aa,
                 )

@@ -139,7 +139,7 @@ class MujocoRobotServer:
         port: int = 5556,
         print_joints: bool = False,
     ):
-        self._has_gripper = gripper_xml_path is not None
+        self._has_gripper = True #gripper_xml_path is not None
         arena = build_scene(xml_path, gripper_xml_path)
 
         assets: Dict[str, str] = {}
@@ -167,7 +167,7 @@ class MujocoRobotServer:
         self._print_joints = print_joints
 
     def num_dofs(self) -> int:
-        return self._num_joints
+        return 7
 
     def get_joint_state(self) -> np.ndarray:
         return self._joint_state
@@ -179,10 +179,24 @@ class MujocoRobotServer:
         )
         if self._has_gripper:
             _joint_state = joint_state.copy()
-            _joint_state[-1] = _joint_state[-1] * 255
+            # Get the rotation input from Dynamixel (in radians)
+            # gripper_rotation = _joint_state[-1]
+
+            # # Convert to linear finger positions (based on your XML ranges)
+            # left_finger_pos = -gripper_rotation * 0.4   # Range: [0, -0.04] meters
+            # right_finger_pos = gripper_rotation * 0.4   # Range: [0, +0.04] meters
+
+            # _joint_state = np.concatenate([
+            #     _joint_state[:-1],  # All arm joints
+            #     [left_finger_pos, right_finger_pos]
+            # ])
+
+            # self._joint_cmd = _joint_state[:-1]
+            #print("joint_state: ", joint_state)
             self._joint_cmd = _joint_state
+            self._joint_cmd[-1] *= 255
         else:
-            self._joint_cmd = joint_state.copy()
+            self._joint_cmd = joint_state[:-1]
 
     def freedrive_enabled(self) -> bool:
         return True
@@ -191,8 +205,25 @@ class MujocoRobotServer:
         pass
 
     def get_observations(self) -> Dict[str, np.ndarray]:
-        joint_positions = self._data.qpos.copy()[: self._num_joints]
-        joint_velocities = self._data.qvel.copy()[: self._num_joints]
+        joint_positions = self._data.qpos.copy()
+        joint_velocities = self._data.qvel.copy()
+    
+        # Convert finger positions back to gripper opening
+        #print("joint_positions: ", joint_positions)
+        arm_joints = joint_positions[:-2]
+        left_finger_pos = joint_positions[-2]
+        right_finger_pos = joint_positions[-1]
+        
+        # Calculate gripper opening from finger separation
+        finger_separation = right_finger_pos - left_finger_pos
+        gripper_opening = finger_separation / (2 * 0.4)  # Normalize to [0,1]
+        gripper_opening = np.clip(gripper_opening, 0, 1)
+        
+        # Return 7 values: 6 arm + 1 gripper for external interface
+        joint_positions_out = np.concatenate([arm_joints, [gripper_opening]])
+        joint_velocities_out = joint_velocities[:7]  # 6 arm + 1 gripper vel
+        gripper_pos_out = np.array([gripper_opening])
+        
         ee_site = "attachment_site"
         try:
             ee_pos = self._data.site_xpos.copy()[
@@ -207,12 +238,12 @@ class MujocoRobotServer:
             ee_pos = np.zeros(3)
             ee_quat = np.zeros(4)
             ee_quat[0] = 1
-        gripper_pos = self._data.qpos.copy()[self._num_joints - 1]
+
         return {
-            "joint_positions": joint_positions,
-            "joint_velocities": joint_velocities,
+            "joint_positions": joint_positions_out,
+            "joint_velocities": joint_velocities_out,
             "ee_pos_quat": np.concatenate([ee_pos, ee_quat]),
-            "gripper_position": gripper_pos,
+            "gripper_position": gripper_pos_out,
         }
 
     def serve(self) -> None:
@@ -225,6 +256,7 @@ class MujocoRobotServer:
                 # mj_step can be replaced with code that also evaluates
                 # a policy and applies a control signal before stepping the physics.
                 self._data.ctrl[:] = self._joint_cmd
+                print("data:" , self._data.ctrl)
                 # self._data.qpos[:] = self._joint_cmd
                 mujoco.mj_step(self._model, self._data)
                 self._joint_state = self._data.qpos.copy()[: self._num_joints]
