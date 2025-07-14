@@ -123,7 +123,7 @@ You should be able to use GELLO to control the simulated robot!
 
 Start pose of gello xarm6 and simulation
 <p align="center">
-  <img src="imgs/start_pose_real&sim.png" />
+  <img src="imgs/start_pose_real&sim.jpg" />
 </p>
 
 Demo of controlling simulation through gello xarm6
