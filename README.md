@@ -52,8 +52,8 @@ The `GelloAgent` class  accepts a `DynamixelRobotConfig` (found in `gello/agents
 We have created a simple script to automatically detect the joint offset:
 * set GELLO into a known configuration, where you know what the corresponding joint angles should be. For example, we set our GELLO for the UFactory xArm6 in this configuration, where we know the desired ground truth joints (90, 180, 270, 180, 0, 90).
 <p align="center">
-  <img src="imgs/teleop_start_pose_1.jpg" width="40%"/>
-  <img src="imgs/teleop_start_pose_2.jpg" width="60%"/>
+  <img src="imgs/teleop_start_pose_1.jpg" width="35%"/>
+  <img src="imgs/teleop_start_pose_2.jpg" width="50%"/>
 </p>
 
 * For the UFactory xArm6 run
