@@ -111,6 +111,10 @@ env _NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia python experimen
 ```
 This launched the robot node. A simulated robot using the mujoco viewer should appear.
 
+<p align="center">
+  <img src="imgs/sim_xarm6_screenshot.png" />
+</p>
+
 Then, launch your GELLO (the controller node).
 ```
 python experiments/run_env.py --agent=gello
