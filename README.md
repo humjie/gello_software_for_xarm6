@@ -53,7 +53,7 @@ We have created a simple script to automatically detect the joint offset:
 * set GELLO into a known configuration, where you know what the corresponding joint angles should be. For example, we set our GELLO for the UFactory xArm6 in this configuration, where we know the desired ground truth joints (90, 180, 270, 180, 0, 90).
 <p align="center">
   <img src="imgs/teleop_start_pose_1.jpg" width="30%"/>
-  <img src="imgs/teleop_start_pose_2.jpg" width="55%"/>
+  <img src="imgs/teleop_start_pose_2.jpg" width="53%"/>
 </p>
 
 * For the UFactory xArm6 run
