@@ -73,7 +73,7 @@ python scripts/gello_get_offset.py \
     --port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT7WBG6
 # replace values with your own
 ```
-* For the Ufactory xArm6 run
+* For the UFactory xArm6 run
 ```
 python scripts/gello_get_offset.py \
     --start-joints 1.571 3.142 4.712 3.142 0 1.571 \ # in radians
@@ -104,7 +104,9 @@ First test your GELLO with a simulated robot to make sure that the joint angles 
 In one terminal run
 ```
 python experiments/launch_nodes.py --robot sim_xarm6
+```
 or
+```
 env _NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia python experiments/launch_nodes.py --robot sim_xarm6
 ```
 This launched the robot node. A simulated robot using the mujoco viewer should appear.
@@ -120,8 +122,6 @@ Once you have verified that your GELLO is properly configured, you can test it o
 
 Before you run with the real robot, you will have to install a robot specific python package.
 The supported robots are in `gello/robots`.
- * UR: [ur_rtde](https://sdurobotics.gitlab.io/ur_rtde/installation/installation.html)
- * panda: [polymetis](https://facebookresearch.github.io/fairo/polymetis/installation.html). If you use a different framework to control the panda, the code is easy to adpot. See/Modify `gello/robots/panda.py`
  * xArm: [xArm python SDK](https://github.com/xArm-Developer/xArm-Python-SDK)
 
 ```
