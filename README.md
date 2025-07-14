@@ -4,11 +4,11 @@ Original repository by [@wuphilipp](https://github.com/wuphilipp).
 
 
 # GELLO
-This is the central repo that holds the all the software for GELLO. See the website for the paper and other resources for GELLO https://wuphilipp.github.io/gello_site/
+This is the modified central repo that holds the all the software for GELLO + UFactory xArm6 software. See the website for the paper and other resources for GELLO https://wuphilipp.github.io/gello_site/
 See the GELLO hardware repo for the STL files and hardware instructions for building your own GELLO https://github.com/wuphilipp/gello_mechanical
 ```
-git clone https://github.com/wuphilipp/gello_software.git
-cd gello_software
+git clone https://github.com/humjie/gello_software_for_xarm6.git
+cd gello_software_for_xarm6
 ```
 
 <p align="center">
@@ -25,23 +25,8 @@ pip install -e .
 pip install -e third_party/DynamixelSDK/python
 ```
 
-## Use with Docker
-First install ```docker``` following this [link](https://docs.docker.com/engine/install/ubuntu/) on your host machine.
-Then you can clone the repo and build the corresponding docker environment
-
-Build the docker image and tag it as gello:latest. If you are going to name it differently, you need to change the launch.py image name
-```
-docker build . -t gello:latest
-```
-
-We have provided an entry point into the docker container
-```
-python scripts/launch.py
-```
-
-## Use with ROS 2
-
-> **Note:** GELLO also supports ROS 2 humble for the Franka FR3 robot. For more details, see the [ROS 2-specific README](ros2/README.md) located in the `ros2` directory.
+## Use with Docker / ROS 2
+For Docker or ROS2, please refer to [gello_software](https://github.com/wuphilipp/gello_software).
 
 # GELLO configuration setup (PLEASE READ)
 Now that you have downloaded the code, there is some additional preparation work to properly configure the Dynamixels and GELLO.
@@ -104,7 +89,8 @@ python scripts/gello_get_offset.py \
 * UR: `1 1 -1 1 1 1`
 * Panda: `1 -1 1 1 1 -1 1`
 * FR3: `1 1 1 1 1 -1 1`
-* xArm: `1 1 1 1 1 1 1`
+* xArm7: `1 1 1 1 1 1 1`
+* xArm6: `1 1 1 1 1 1`
 
 The script prints out a list of joint offsets. Go to `gello/agents/gello_agent.py` and add a DynamixelRobotConfig to the PORT_CONFIG_MAP. You are now ready to run your GELLO!
 
@@ -117,7 +103,9 @@ For multiprocessing, we leverage [ZMQ](https://zeromq.org/)
 First test your GELLO with a simulated robot to make sure that the joint angles match as expected.
 In one terminal run
 ```
-python experiments/launch_nodes.py --robot <sim_ur, sim_panda, or sim_xarm>
+python experiments/launch_nodes.py --robot sim_xarm6
+or
+env _NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia python experiments/launch_nodes.py --robot sim_xarm6
 ```
 This launched the robot node. A simulated robot using the mujoco viewer should appear.
 
@@ -138,7 +126,7 @@ The supported robots are in `gello/robots`.
 
 ```
 # Launch all of the node
-python experiments/launch_nodes.py --robot=<your robot>
+python experiments/launch_nodes.py --robot=xarm6
 # run the enviroment loop
 python experiments/run_env.py --agent=gello
 ```
@@ -154,10 +142,6 @@ Data can then be processed using the demo_to_gdict script.
 python gello/data_utils/demo_to_gdict.py --source-dir=<source dir location>
 ```
 
-## Running a bimanual system with GELLO
-GELLO also be used in bimanual configurations.
-For an example, see the `bimanual_ur` robot in `launch_nodes.py` and `--bimanual` flag in the `run_env.py` script.
-
 ## Notes
 Due to the use of multiprocessing, sometimes python process are not killed properly. We have provided the kill_nodes script which will kill the
 python processes.
@@ -165,18 +149,7 @@ python processes.
 ./kill_nodes.sh
 ```
 
-### Using a new robot!
-If you want to use a new robot you need a GELLO that is compatible. If the kiniamtics are close enough, you may directly use an existing GELLO. Otherwise you will have to design your own.
-To add a new robot, simply implement the `Robot` protocol found in `gello/robots/robot`. See `gello/robots/panda.py`, `gello/robots/ur.py`, `gello/robots/xarm_robot.py` for examples.
-
-### Contributing
-Please make a PR if you would like to contribute! The goal of this project is to enable more accessible and higher quality teleoperation devices and we would love your input!
-
-You can optionally install some dev packages.
-```
-pip install -r requirements_dev.txt
-```
-
+### Structure
 The code is organized as follows:
  * `scripts`: contains some helpful python `scripts`
  * `experiments`: contains entrypoints into the gello code
@@ -188,14 +161,6 @@ The code is organized as follows:
     * `dynamixel`: code to interface with the dynamixel hardware
     * `robots`: robot specific interfaces
     * `zmq_core`: zmq utilities for enabling a multi node system
-
-
-This code base uses `isort` and `black` for code formatting.
-pre-commits hooks are great. This will automatically do some checking/formatting. To use the pre-commit hooks, run the following:
-```
-pip install pre-commit
-pre-commit install
-```
 
 # Citation
 
