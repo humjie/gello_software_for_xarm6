@@ -139,7 +139,7 @@ class MujocoRobotServer:
         port: int = 5556,
         print_joints: bool = False,
     ):
-        self._has_gripper = True #gripper_xml_path is not None
+        self._has_gripper = True  # gripper_xml_path is not None
         arena = build_scene(xml_path, gripper_xml_path)
 
         assets: Dict[str, str] = {}
@@ -192,7 +192,7 @@ class MujocoRobotServer:
             # ])
 
             # self._joint_cmd = _joint_state[:-1]
-            #print("joint_state: ", joint_state)
+            # print("joint_state: ", joint_state)
             self._joint_cmd = _joint_state
             self._joint_cmd[-1] *= 255
         else:
@@ -207,23 +207,23 @@ class MujocoRobotServer:
     def get_observations(self) -> Dict[str, np.ndarray]:
         joint_positions = self._data.qpos.copy()
         joint_velocities = self._data.qvel.copy()
-    
+
         # Convert finger positions back to gripper opening
-        #print("joint_positions: ", joint_positions)
+        # print("joint_positions: ", joint_positions)
         arm_joints = joint_positions[:-2]
         left_finger_pos = joint_positions[-2]
         right_finger_pos = joint_positions[-1]
-        
+
         # Calculate gripper opening from finger separation
         finger_separation = right_finger_pos - left_finger_pos
         gripper_opening = finger_separation / (2 * 0.4)  # Normalize to [0,1]
         gripper_opening = np.clip(gripper_opening, 0, 1)
-        
+
         # Return 7 values: 6 arm + 1 gripper for external interface
         joint_positions_out = np.concatenate([arm_joints, [gripper_opening]])
         joint_velocities_out = joint_velocities[:7]  # 6 arm + 1 gripper vel
         gripper_pos_out = np.array([gripper_opening])
-        
+
         ee_site = "attachment_site"
         try:
             ee_pos = self._data.site_xpos.copy()[
@@ -256,7 +256,7 @@ class MujocoRobotServer:
                 # mj_step can be replaced with code that also evaluates
                 # a policy and applies a control signal before stepping the physics.
                 self._data.ctrl[:] = self._joint_cmd
-                print("data:" , self._data.ctrl)
+                print("data:", self._data.ctrl)
                 # self._data.qpos[:] = self._joint_cmd
                 mujoco.mj_step(self._model, self._data)
                 self._joint_state = self._data.qpos.copy()[: self._num_joints]

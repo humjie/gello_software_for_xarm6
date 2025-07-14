@@ -84,6 +84,7 @@ class PrintRobot(Robot):
             "gripper_position": np.array([0]),
         }
 
+
 class BimanualRobot(Robot):
     def __init__(self, robot_l: Robot, robot_r: Robot):
         self._robot_l = robot_l

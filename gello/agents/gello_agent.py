@@ -24,7 +24,7 @@ class DynamixelRobotConfig:
 
     gripper_config: Tuple[int, int, int]
     """The gripper config of GELLO. This is a tuple of (gripper_joint_id, degrees in open_position, degrees in closed_position)."""
-    
+
     start_joints: Optional[Tuple[float, ...]] = None  # <--- add this line
     """The initial joint angles of GELLO. If not provided, the robot will be initialized with zeros."""
 
@@ -80,12 +80,12 @@ PORT_CONFIG_MAP: Dict[str, DynamixelRobotConfig] = {
     "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTAAMN19-if00-port0": DynamixelRobotConfig(
         joint_ids=(0, 1, 2, 3, 4, 5),  # 6 arm joints
         joint_offsets=(
-            1 * np.pi / 2,   # 7.854
-            2 * np.pi / 2,   # 3.142
-            3 * np.pi / 2,   # 3.142
-            2 * np.pi / 2,   # 3.142
-            0 * np.pi / 2,   # 3.142
-            1 * np.pi / 2,   # 4.712
+            1 * np.pi / 2,  # 1.571
+            2 * np.pi / 2,  # 3.142
+            3 * np.pi / 2,  # 4.712
+            2 * np.pi / 2,  # 3.142
+            0 * np.pi / 2,  # 0
+            1 * np.pi / 2,  # 1.571
         ),
         joint_signs=(1, 1, 1, 1, 1, 1),  # 6 arm
         gripper_config=(6, 198.4328125, 156.6328125),  # Gripper
@@ -141,7 +141,7 @@ class GelloAgent(Agent):
 
     def act(self, obs: Dict[str, np.ndarray]) -> np.ndarray:
         return self._robot.get_joint_state()
-        '''
+        """
         print(f"Current joint state: {dyna_joints}")
         if len(dyna_joints) == 6:
             # Only arm joints, add gripper
@@ -164,4 +164,4 @@ class GelloAgent(Agent):
             return obs["joint_positions"]
         else:
             self._robot.set_torque_mode(False)
-            return dyna_joints'''
+            return dyna_joints"""
