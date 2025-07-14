@@ -127,7 +127,7 @@ Start pose of gello xarm6 and simulation
 </p>
 
 Demo of controlling simulation through gello xarm6
-[Watch demo video](imgs/real&sim_demo.mp4)
+[Download demo video](imgs/real&sim_demo.mp4) or [Watch demo video in google drive](https://drive.google.com/file/d/16PyH-7bziJTT9tNBtZjl-RmCDRU3qhW_/view?usp=sharing)
 
 ## Running on a real robot.
 Once you have verified that your GELLO is properly configured, you can test it on a real robot!
