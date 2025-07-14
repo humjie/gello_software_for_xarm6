@@ -91,7 +91,7 @@ env _NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia python experimen
 This launched the robot node. A simulated robot using the mujoco viewer should appear.
 
 <p align="center">
-  <img src="imgs/sim_xarm6_screenshot.png" />
+  <img src="imgs/sim_xarm6_screenshot.png" width="80%"/>
 </p>
 
 Then, launch your GELLO (the controller node).
@@ -102,7 +102,7 @@ You should be able to use GELLO to control the simulated robot!
 
 Start pose of gello xarm6 and simulation:
 <p align="center">
-  <img src="imgs/start_pose_real&sim.jpg" />
+  <img src="imgs/start_pose_real&sim.jpg" width="80%"/>
 </p>
 
 Demo of simulation:
