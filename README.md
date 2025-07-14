@@ -121,6 +121,14 @@ python experiments/run_env.py --agent=gello
 ```
 You should be able to use GELLO to control the simulated robot!
 
+Start pose of gello xarm6 and simulation
+<p align="center">
+  <img src="imgs/start_pose_real&sim.png" />
+</p>
+
+Demo of controlling simulation through gello xarm6
+[Watch demo video](imgs/real&sim_demo.mp4)
+
 ## Running on a real robot.
 Once you have verified that your GELLO is properly configured, you can test it on a real robot!
 
