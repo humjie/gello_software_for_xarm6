@@ -50,29 +50,12 @@ Dynamixels have a symmetric 4 hole pattern which means there the joint offset is
 The `GelloAgent` class  accepts a `DynamixelRobotConfig` (found in `gello/agents/gello_agent.py`). The Dynamixel config specifies the parameters you need to find to operate your GELLO. Look at the documentation for more details.
 
 We have created a simple script to automatically detect the joint offset:
-* set GELLO into a known configuration, where you know what the corresponding joint angles should be. For example, we set our GELLO for the UR and Franka FR3 in this configuration, where we know the desired ground truth joints (0, -90, 90, -90, -90, 0), or (0, 0, 0, -90, 0, 90 , 0) respectively.
+* set GELLO into a known configuration, where you know what the corresponding joint angles should be. For example, we set our GELLO for the UFactory xArm6 in this configuration, where we know the desired ground truth joints (90, 180, 270, 180, 0, 90).
 <p align="center">
-  <img src="imgs/gello_matching_joints.jpg" width="29%"/>
-  <img src="imgs/robot_known_configuration.jpg" width="29%"/>
-  <img src="imgs/fr3_gello_calib_pose.jpeg" width="31%"/>
+  <img src="imgs/teleop_start_pose_1.jpg" width="40%"/>
+  <img src="imgs/teleop_start_pose_2.jpg" width="60%"/>
 </p>
 
-* For the UR run 
-```
-python scripts/gello_get_offset.py \
-    --start-joints 0 -1.57 1.57 -1.57 -1.57 0 \ # in radians
-    --joint-signs 1 1 -1 1 1 1 \
-    --port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT7WBG6
-# replace values with your own
-```
-* For the Franka FR3 run
-```
-python scripts/gello_get_offset.py \
-    --start-joints 0 0 0 -1.57 0 1.57 0 \ # in radians
-    --joint-signs 1 1 1 1 1 1 \
-    --port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT7WBG6
-# replace values with your own
-```
 * For the UFactory xArm6 run
 ```
 python scripts/gello_get_offset.py \
@@ -85,12 +68,8 @@ python scripts/gello_get_offset.py \
 * Depending on the mechanical setup of your GELLO, the joint signs can flip, so you need to specify them for each axis.
 * Use your serial port for `port`. You can find the port id of your U2D2 Dynamixel device by running `ls /dev/serial/by-id` and looking for the path that starts with `usb-FTDI_USB__-__Serial_Converter` (on Ubuntu). On Mac, look in /dev/ and the device that starts with `cu.usbserial`
 
-`joint-signs` for each robot type:
-* UR: `1 1 -1 1 1 1`
-* Panda: `1 -1 1 1 1 -1 1`
-* FR3: `1 1 1 1 1 -1 1`
-* xArm7: `1 1 1 1 1 1 1`
-* xArm6: `1 1 1 1 1 1`
+`joint-signs` for robot type:
+* xarm6: `1 1 1 1 1 1`
 
 The script prints out a list of joint offsets. Go to `gello/agents/gello_agent.py` and add a DynamixelRobotConfig to the PORT_CONFIG_MAP. You are now ready to run your GELLO!
 
@@ -126,8 +105,8 @@ Start pose of gello xarm6 and simulation:
   <img src="imgs/start_pose_real&sim.jpg" />
 </p>
 
-Demo of controlling simulation through gello xarm6:
-[Download demo video](imgs/real&sim_demo.mp4) or [Watch demo video in google drive](https://drive.google.com/file/d/16PyH-7bziJTT9tNBtZjl-RmCDRU3qhW_/view?usp=sharing)
+Demo of simulation:
+[Watch simulation demo video in google drive](https://drive.google.com/file/d/1DA3d92iHF-z25ouA-PkakIWlr_FSOSi2/view?usp=sharing)
 
 ## Running on a real robot.
 Once you have verified that your GELLO is properly configured, you can test it on a real robot!
@@ -142,6 +121,9 @@ python experiments/launch_nodes.py --robot=xarm6
 # run the enviroment loop
 python experiments/run_env.py --agent=gello
 ```
+
+Demo of teleoperation:
+[Watch teleoperation demo video in google drive](https://drive.google.com/file/d/1xs-ea0IrjQBcEmZ_FC9mKrrUrs_snx54/view?usp=sharing)
 
 Ideally you can start your GELLO near a known configuration each time. If this is possible, you can set the `--start-joint` flag with GELLO's known starting configuration. This also enables the robot to reset before you begin teleoperation.
 
