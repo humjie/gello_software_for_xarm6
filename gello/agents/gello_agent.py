@@ -24,6 +24,9 @@ class DynamixelRobotConfig:
 
     gripper_config: Tuple[int, int, int]
     """The gripper config of GELLO. This is a tuple of (gripper_joint_id, degrees in open_position, degrees in closed_position)."""
+    
+    start_joints: Optional[Tuple[float, ...]] = None  # <--- add this line
+    """The initial joint angles of GELLO. If not provided, the robot will be initialized with zeros."""
 
     def __post_init__(self):
         assert len(self.joint_ids) == len(self.joint_offsets)

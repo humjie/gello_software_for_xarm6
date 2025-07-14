@@ -117,7 +117,7 @@ def main(args):
                     )
             if args.start_joints is None:
                 reset_joints = np.array(
-                    [0, 0.00576, 0.00498, 0, 0.00154, 0.000737, 0]  # 6 arm + 1 gripper
+                    [0, 0.00576, 0.01098, 0, 0.00854, 0.000737, 0]  # 6 arm + 1 gripper
                 )  # Change this to your own reset joints
             else:
                 reset_joints = args.start_joints

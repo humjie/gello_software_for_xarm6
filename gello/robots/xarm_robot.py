@@ -133,7 +133,7 @@ class XArmRobot(Robot):
         if len(joint_state) == 6:
             self.set_command(joint_state, None)
         elif len(joint_state) == 7:
-            self.set_command(joint_state[:7], joint_state[7])
+            self.set_command(joint_state[:6], joint_state[6])
         else:
             raise ValueError(
                 f"Invalid joint state: {joint_state}, len={len(joint_state)}"
@@ -153,6 +153,7 @@ class XArmRobot(Robot):
         real: bool = True,
         control_frequency: float = 50.0,
         max_delta: float = DEFAULT_MAX_DELTA,
+        model: Optional[str] = None,
     ):
         print(ip)
         self.real = real
@@ -209,7 +210,7 @@ class XArmRobot(Robot):
         time.sleep(1)
         self.robot.set_gripper_mode(0)
         time.sleep(1)
-        self.robot.set_gripper_speed(100)
+        self.robot.set_gripper_speed(3000)
         time.sleep(1)
 
     def _get_gripper_pos(self) -> float:

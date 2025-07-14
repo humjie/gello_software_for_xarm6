@@ -2,3 +2,5 @@ env _NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia python experimen
 
 python experiments/run_env.py --agent=gello
 
+sudo ip addr add 192.168.1.100/24 dev eno1
+sudo ip link set eno1 up
