@@ -88,7 +88,7 @@ python scripts/gello_get_offset.py \
     --port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT7WBG6
 # replace values with your own
 ```
-* For the Ufactory XArm6 run
+* For the Ufactory xArm6 run
 ```
 python scripts/gello_get_offset.py \
     --start-joints 1.571 3.142 4.712 3.142 0 1.571 \ # in radians
