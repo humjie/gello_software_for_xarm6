@@ -202,6 +202,8 @@ class Args:
 
 def main(args):
     subdirs = natsorted(glob.glob(os.path.join(args.source_dir, "*/"), recursive=True))
+    if len(subdirs) == 0:
+        subdirs = [args.source_dir]
 
     output_dir = args.source_dir
     if output_dir[-1] == "/":
