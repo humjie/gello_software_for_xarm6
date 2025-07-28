@@ -70,6 +70,13 @@ def launch_robot_server(args: Args):
         if args.robot == "xarm6":
             from gello.robots.xarm_robot import XArmRobot
             robot = XArmRobot(ip=args.robot_ip, model="xarm6")
+            robot.start_position_monitoring(
+                x_min=-308, x_max=962,
+                y_min=-615, y_max=610,
+                z_min=-75, z_max=570
+            )
+            print(f"Position monitoring started with boundaries: {robot.get_position_boundaries()}")
+        
         elif args.robot == "xarm":
             from gello.robots.xarm_robot import XArmRobot
             robot = XArmRobot(ip=args.robot_ip, model="xarm7")

@@ -119,6 +119,14 @@ class XArmRobot(Robot):
     GRIPPER_CLOSE = 0
     #  MAX_DELTA = 0.2
     DEFAULT_MAX_DELTA = 0.05
+    DEFAULT_WORKSPACE_LIMITS = {
+            'x_min': -308,  # mm
+            'x_max': 962,  # mm
+            'y_min': -615,  # mm
+            'y_max': 610,  # mm
+            'z_min': -75,  # mm
+            'z_max': 570,  # mm
+        }
 
     def num_dofs(self) -> int:
         return 7
@@ -140,6 +148,7 @@ class XArmRobot(Robot):
             )
 
     def stop(self):
+        self.stop_position_monitoring()  # Stop monitoring first
         self.running = False
         if self.robot is not None:
             self.robot.disconnect()
@@ -151,13 +160,17 @@ class XArmRobot(Robot):
         self,
         ip: str = "192.168.1.221",
         real: bool = True,
-        control_frequency: float = 50.0,
+        control_frequency: float = 500.0,
         max_delta: float = DEFAULT_MAX_DELTA,
         model: Optional[str] = None,
     ):
         print(ip)
         self.real = real
         self.max_delta = max_delta
+        self.monitoring = False
+        self.monitor_thread = None
+        self.boundaries = self.DEFAULT_WORKSPACE_LIMITS.copy()
+    
         if real:
             from xarm.wrapper import XArmAPI
 
@@ -174,13 +187,20 @@ class XArmRobot(Robot):
         self.last_state = self._update_last_state()
         self.target_command = {
             "joints": self.last_state.joints(),
-            "gripper": 0,
+            "gripper": 1,
         }
         self.running = True
         self.command_thread = None
+
+        # Add these variables to constructor
+        self.joint_history = []
+        self.history_size = 3  # Number of past commands to average
+    
         if real:
             self.command_thread = threading.Thread(target=self._robot_thread)
             self.command_thread.start()
+        
+        self.recorded_maxmin = {"x_max": 0, "x_min": 0, "y_max": 0, "y_min": 0, "z_max": 0, "z_min": 0}
 
     def get_state(self) -> RobotState:
         with self.last_state_lock:
@@ -188,8 +208,16 @@ class XArmRobot(Robot):
 
     def set_command(self, joints: np.ndarray, gripper: Optional[float] = None) -> None:
         with self.target_command_lock:
+            # Add current command to history
+            self.joint_history.append(joints)
+            if len(self.joint_history) > self.history_size:
+                self.joint_history.pop(0)
+            
+            # Average the commands
+            smoothed_joints = np.mean(self.joint_history, axis=0)
+            
             self.target_command = {
-                "joints": joints,
+                "joints": smoothed_joints,
                 "gripper": gripper,
             }
 
@@ -199,19 +227,23 @@ class XArmRobot(Robot):
         self.robot.clean_error()
         self.robot.clean_warn()
         self.robot.motion_enable(True)
-        time.sleep(1)
+        time.sleep(0.01)
         self.robot.set_mode(1)
-        time.sleep(1)
+        time.sleep(0.01)
         self.robot.set_collision_sensitivity(0)
-        time.sleep(1)
+        time.sleep(0.01)
         self.robot.set_state(state=0)
-        time.sleep(1)
+        time.sleep(0.01)
         self.robot.set_gripper_enable(True)
-        time.sleep(1)
+        time.sleep(0.01)
         self.robot.set_gripper_mode(0)
-        time.sleep(1)
-        self.robot.set_gripper_speed(3000)
-        time.sleep(1)
+        time.sleep(0.01)
+        self.robot.set_gripper_speed(10000)
+        time.sleep(0.01)
+        self.robot.set_joint_jerk(50)  # Default is 100
+        time.sleep(0.01)
+        self.robot.set_joint_maxacc(3)  # Default is 5
+        time.sleep(0.01)
 
     def _get_gripper_pos(self) -> float:
         if self.robot is None:
@@ -224,7 +256,7 @@ class XArmRobot(Robot):
             if code == 22:
                 self._clear_error_states()
 
-        normalized_gripper_pos = (gripper_pos - self.GRIPPER_OPEN) / (
+        normalized_gripper_pos = 1.0 - (gripper_pos - self.GRIPPER_OPEN) / (
             self.GRIPPER_CLOSE - self.GRIPPER_OPEN
         )
         return normalized_gripper_pos
@@ -337,21 +369,127 @@ class XArmRobot(Robot):
             "ee_pos_quat": pos_quat,
             "gripper_position": np.array(state.gripper_pos()),
         }
+    
+    def start_position_monitoring(self, x_min=None, x_max=None, y_min=None, y_max=None, 
+                                z_min=None, z_max=None, check_interval=0.1):
+        """Start continuous position monitoring with custom boundaries"""
+        # Stop any existing monitoring
+        self.stop_position_monitoring()
+        
+        # Use provided values or defaults
+        self.boundaries = {
+            'x_min': x_min if x_min is not None else self.DEFAULT_WORKSPACE_LIMITS['x_min'],
+            'x_max': x_max if x_max is not None else self.DEFAULT_WORKSPACE_LIMITS['x_max'],
+            'y_min': y_min if y_min is not None else self.DEFAULT_WORKSPACE_LIMITS['y_min'],
+            'y_max': y_max if y_max is not None else self.DEFAULT_WORKSPACE_LIMITS['y_max'],
+            'z_min': z_min if z_min is not None else self.DEFAULT_WORKSPACE_LIMITS['z_min'],
+            'z_max': z_max if z_max is not None else self.DEFAULT_WORKSPACE_LIMITS['z_max'],
+        }
+        
+        def monitor_position():
+            while self.monitoring and self.running:
+                if self.robot is not None:
+                    state = self.get_state()
+                    x, y, z = state.cartesian_pos() * 1000  # Convert m to mm
+                    
+                    print(f"Current position: [{x:.2f}, {y:.2f}, {z:.2f}]")
+
+                    if x > self.recorded_maxmin['x_max']:
+                        self.recorded_maxmin['x_max'] = x
+                    if x < self.recorded_maxmin['x_min']:
+                        self.recorded_maxmin['x_min'] = x
+                    if y > self.recorded_maxmin['y_max']:
+                        self.recorded_maxmin['y_max'] = y
+                    if y < self.recorded_maxmin['y_min']:
+                        self.recorded_maxmin['y_min'] = y
+                    if z > self.recorded_maxmin['z_max']:
+                        self.recorded_maxmin['z_max'] = z
+                    if z < self.recorded_maxmin['z_min']:
+                        self.recorded_maxmin['z_min'] = z
+                    #print(f"Recorded max/min: {self.recorded_maxmin}")
+
+                    if (x < self.boundaries['x_min'] or x > self.boundaries['x_max'] or
+                        y < self.boundaries['y_min'] or y > self.boundaries['y_max'] or
+                        z < self.boundaries['z_min'] or z > self.boundaries['z_max']):
+                        print(f"EMERGENCY STOP: Position [{x:.2f}, {y:.2f}, {z:.2f}] is outside safe boundaries:")
+                        print(f"Range X: {self.boundaries['x_min']} to {self.boundaries['x_max']}    Current X: {x:.2f}")
+                        print(f"Range Y: {self.boundaries['y_min']} to {self.boundaries['y_max']}    Current Y: {y:.2f}")
+                        print(f"Range Z: {self.boundaries['z_min']} to {self.boundaries['z_max']}    Current Z: {z:.2f}")
+
+                        if self.robot is not None:
+                            self.robot.emergency_stop()
+                        self.monitoring = False
+                        break
+                time.sleep(check_interval)
+        
+        self.monitoring = True
+        self.monitor_thread = threading.Thread(target=monitor_position)
+        self.monitor_thread.daemon = True
+        self.monitor_thread.start()
+        print(f"Position monitoring started with boundaries: {self.boundaries}")
+        
+    def stop_position_monitoring(self):
+        """Stop position monitoring"""
+        if hasattr(self, 'monitoring') and self.monitoring:
+            self.monitoring = False
+            if hasattr(self, 'monitor_thread') and self.monitor_thread is not None:
+                self.monitor_thread.join(timeout=1.0)
+                print("Position monitoring stopped")
+                
+    def get_position_boundaries(self):
+        """Get current position boundaries"""
+        if hasattr(self, 'boundaries'):
+            return self.boundaries
+        return self.DEFAULT_WORKSPACE_LIMITS
 
 
 def main():
     ip = "192.168.1.221"
     robot = XArmRobot(ip)
     import time
-
-    time.sleep(1)
-    print(robot.get_state())
-
-    time.sleep(1)
-    print(robot.get_state())
-    print("end")
+    
+    # Start position monitoring with default boundaries
+    robot.start_position_monitoring()
+    
+    # Get current state and position
+    state = robot.get_state()
+    print(f"Current position: {state.cartesian_pos() * 1000}mm")
+    print(f"Current boundaries: {robot.get_position_boundaries()}")
+    
+    # Allow time to see the output
+    time.sleep(2)
+    
+    # Set custom boundaries
+    robot.start_position_monitoring(
+        x_min=-308, x_max=962,
+        y_min=-615, y_max=610,
+        z_min=-75, z_max=570
+    )
+    
+    # Show custom boundaries
+    print(f"Updated boundaries: {robot.get_position_boundaries()}")
+    
+    # Send a small joint movement
+    current_joints = robot.get_state().joints()
+    robot.set_command(current_joints + np.array([0.01, 0, 0, 0, 0, 0]))
+    
+    # Wait a bit
+    time.sleep(2)
+    
+    # Temporarily disable monitoring
+    robot.stop_position_monitoring()
+    print("Monitoring disabled - robot can move anywhere")
+    
+    # Wait a bit
+    time.sleep(2)
+    
+    # Re-enable with default boundaries
+    robot.start_position_monitoring()
+    
+    # Clean up
+    print("Stopping robot")
     robot.stop()
-
+    print("Robot stopped")
 
 if __name__ == "__main__":
     main()

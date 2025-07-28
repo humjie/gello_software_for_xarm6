@@ -38,7 +38,7 @@ class Args:
     gello_port: Optional[str] = None
     mock: bool = False
     use_save_interface: bool = False
-    data_dir: str = "~/bc_data"
+    data_dir: str = "~/gello_software/bc_data"
     bimanual: bool = False
     verbose: bool = False
 
