@@ -129,7 +129,10 @@ Ideally you can start your GELLO near a known configuration each time. If this i
 
 ## Collect data
 We have provided a simple example for collecting data with gello.
-To save trajectories with the keyboard, add the following flag `--use-save-interface`
+To save trajectories with the keyboard, add the following flag `--use-save-interface` when running the environment loop.
+```
+python experiments/run_env.py --agent=gello --use-save-interface
+```
 
 Data can then be processed using the demo_to_gdict script.
 ```
