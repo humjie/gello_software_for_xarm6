@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
+import threading
+import time
 
 import tyro
 
@@ -69,13 +71,39 @@ def launch_robot_server(args: Args):
     else:
         if args.robot == "xarm6":
             from gello.robots.xarm_robot import XArmRobot
+            print(f"Initializing XArm6 robot with IP: {args.robot_ip}")
             robot = XArmRobot(ip=args.robot_ip, model="xarm6")
+            
+            # Start server in a separate thread so we can continue initialization
+            print(f"Starting robot server on port {port}, host {args.hostname}")
+            server = ZMQServerRobot(robot, port=port, host=args.hostname)
+            server_thread = threading.Thread(target=server.serve)
+            server_thread.daemon = True
+            server_thread.start()
+            
+            # Wait for robot initialization to complete before setting up monitoring
+            print(f"Waiting for robot initialization (press 's' then Enter in terminal to initialize)...")
+            robot.wait_for_initialization()
+            print("Robot initialization completed!")
+            
+            # Only start position monitoring after initialization
+            print("Starting position monitoring with custom boundaries...")
             robot.start_position_monitoring(
-                x_min=-308, x_max=962,
-                y_min=-615, y_max=610,
-                z_min=-75, z_max=570
+                x_min=0, x_max=745,
+                y_min=-400, y_max=610,
+                z_min=-32, z_max=450
             )
             print(f"Position monitoring started with boundaries: {robot.get_position_boundaries()}")
+            print("Robot server is fully operational and ready for connections.")
+            
+            # Keep main thread alive
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("Shutting down robot server...")
+                robot.stop()
+                print("Robot server stopped.")
         
         elif args.robot == "xarm":
             from gello.robots.xarm_robot import XArmRobot

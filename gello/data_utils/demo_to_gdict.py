@@ -51,7 +51,7 @@ from gello.data_utils.conversion_utils import preproc_obs
 
 def get_act_min_max(source_dir: str) -> Tuple[np.ndarray, np.ndarray]:
     pkls = natsorted(
-        glob.glob(os.path.join(source_dir, "**/*.pkl"), recursive=True), reverse=True
+        glob.glob(os.path.join(source_dir, "*.pkl"), recursive=True), reverse=True
     )
     if len(pkls) <= 30:
         print(f"Skipping {source_dir} because it has less than 30 frames.")
@@ -78,7 +78,7 @@ def get_act_min_max(source_dir: str) -> Tuple[np.ndarray, np.ndarray]:
         else:
             assert scale_max is not None
             scale_min = np.minimum(scale_min, curr_scale_factor)
-            scale_max = np.maximum(scale_min, curr_scale_factor)
+            scale_max = np.maximum(scale_max, curr_scale_factor)
 
     assert scale_min is not None
     assert scale_max is not None
@@ -104,7 +104,7 @@ def convert_single_demo(
     """
 
     pkls = natsorted(
-        glob.glob(os.path.join(source_dir, "**/*.pkl"), recursive=True), reverse=True
+        glob.glob(os.path.join(source_dir, "*.pkl"), recursive=True), reverse=True
     )
     demo_stack = []
 
@@ -201,9 +201,12 @@ class Args:
 
 
 def main(args):
-    subdirs = natsorted(glob.glob(os.path.join(args.source_dir, "*/"), recursive=True))
-    if len(subdirs) == 0:
-        subdirs = [args.source_dir]
+    # Expand the home directory path (~)
+    args.source_dir = os.path.expanduser(args.source_dir)
+
+    #subdirs = natsorted(glob.glob(os.path.join(args.source_dir, "*/"), recursive=True))
+    #if len(subdirs) == 0:
+    subdirs = [args.source_dir]
 
     output_dir = args.source_dir
     if output_dir[-1] == "/":
@@ -211,17 +214,18 @@ def main(args):
 
     output_dir = os.path.join(output_dir, "_conv")
 
+    # Use makedirs instead of mkdir to create parent directories if needed
     if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
 
     output_dir = os.path.join(output_dir, "multiview")
 
     if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
     else:
         print(f"Output directory {output_dir} already exists, and will be deleted")
         shutil.rmtree(output_dir)
-        os.mkdir(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
 
     train_dir = os.path.join(output_dir, "train")
     val_dir = os.path.join(output_dir, "val")

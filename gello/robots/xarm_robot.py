@@ -124,9 +124,12 @@ class XArmRobot(Robot):
             'x_max': 962,  # mm
             'y_min': -615,  # mm
             'y_max': 610,  # mm
-            'z_min': -75,  # mm
-            'z_max': 570,  # mm
+            'z_min': -32,  # mm
+            'z_max': 450,  # mm
         }
+    INITIAL_POSITION = [377.49, 2.07, -4.87]
+    INITIAL_ANGLES =[0.015336, 0.062893, -0.004608, 0.058289, -0.029144, -0.159536, 0.0]
+    TOLERANCE = 0.05
 
     def num_dofs(self) -> int:
         return 7
@@ -149,12 +152,14 @@ class XArmRobot(Robot):
 
     def stop(self):
         self.stop_position_monitoring()  # Stop monitoring first
-        self.running = False
+        self.running = False  # This will also stop the emergency stop listener
         if self.robot is not None:
             self.robot.disconnect()
 
         if self.command_thread is not None:
             self.command_thread.join()
+            
+        print("Robot stopped and all threads terminated.")
 
     def __init__(
         self,
@@ -170,18 +175,24 @@ class XArmRobot(Robot):
         self.monitoring = False
         self.monitor_thread = None
         self.boundaries = self.DEFAULT_WORKSPACE_LIMITS.copy()
-    
+        self.locked_after_emergency = False
+        self.initialization_complete = False  # Add flag to track initialization
+        self.initialization_event = threading.Event()  # Add event for synchronization
+
         if real:
             from xarm.wrapper import XArmAPI
-
             self.robot = XArmAPI(ip, is_radian=True)
+            # Verify connection
+            if not self._verify_connection():
+                raise ConnectionError(f"Failed to connect to robot at {ip}")
         else:
             self.robot = None
 
         self._control_frequency = control_frequency
         self._clear_error_states()
         self._set_gripper_position(self.GRIPPER_OPEN)
-
+        
+        # Setup state variables regardless of initialization
         self.last_state_lock = threading.Lock()
         self.target_command_lock = threading.Lock()
         self.last_state = self._update_last_state()
@@ -191,22 +202,301 @@ class XArmRobot(Robot):
         }
         self.running = True
         self.command_thread = None
-
-        # Add these variables to constructor
         self.joint_history = []
         self.history_size = 3  # Number of past commands to average
-    
-        if real:
-            self.command_thread = threading.Thread(target=self._robot_thread)
-            self.command_thread.start()
-        
         self.recorded_maxmin = {"x_max": 0, "x_min": 0, "y_max": 0, "y_min": 0, "z_max": 0, "z_min": 0}
+        
+        # Start initialization in a separate thread
+        if real:
+            init_thread = threading.Thread(target=self._initialize_robot)
+            init_thread.daemon = True
+            init_thread.start()
+            
+            # Start emergency stop listener thread
+            emergency_thread = threading.Thread(target=self._emergency_stop_listener)
+            emergency_thread.daemon = True
+            emergency_thread.start()
+        else:
+            self.initialization_complete = True
+            self.initialization_event.set()
+
+    def _initialize_robot(self):
+        """Initialize the robot in a separate thread"""
+        print("Press 's' then Enter to let robot go home and start the program.")
+        print("NOTE: This process must complete before run_env.py can connect to the robot.")
+        print("After initialization, you can press 'e' + Enter for emergency stop, or 'q' + Enter to quit.")
+        while True:
+            user_input = input()
+            if user_input.strip().lower() == 's':
+                print("Clearing error and resuming...")
+                # Clear error and enable motion
+                self.robot.clean_error()
+                time.sleep(1)
+                
+                if self.real and self.robot is not None:
+                    print("Moving to home position...")
+                    print(f"Target initial angles: {self.INITIAL_ANGLES}")
+                    self.robot.set_reduced_mode(True)
+                    self.robot.set_reduced_max_joint_speed(0.2)  # rad/s
+                    self.robot.set_reduced_max_tcp_speed(100)     # mm/s
+
+                    # Initialize ret variable
+                    ret = 0
+                    
+                    while True:
+                        current = self.robot.get_servo_angle(is_radian=True)[1]
+                        step = [(t - c) * 0.05 for t, c in zip(self.INITIAL_ANGLES, current)]
+                        next_pos = [c + s for c, s in zip(current, step)]
+                        ret = self.robot.set_servo_angle_j(angles=next_pos, is_radian=True)
+                        if ret != 0:
+                            print(f"Error in set_servo_angle_j during initialization: {ret}")
+                            self._clear_error_states()
+                        time.sleep(0.05)  # Lower frequency → slower motion
+                        
+                        # Check after movement if we've reached the target
+                        current = self.robot.get_servo_angle(is_radian=True)[1]
+                        if all(abs(t - c) < self.TOLERANCE for t, c in zip(self.INITIAL_ANGLES, current)):
+                            print("Target reached.")
+                            break
+
+                self.robot.set_reduced_mode(False)
+                time.sleep(1)
+                
+                # Start the command thread now that initialization is complete
+                if self.command_thread is None:
+                    # Save the current position as the target command to prevent immediate movement
+                    code, current_joints = self.robot.get_servo_angle(is_radian=True)
+                    if code != 0:
+                        print(f"Error getting joint angles: {code}")
+                        self._clear_error_states()
+                        code, current_joints = self.robot.get_servo_angle(is_radian=True)
+                    
+                    # Update last_state to match the current position
+                    self.last_state = self._update_last_state()
+                    
+                    # Update target_command with the actual current position
+                    with self.target_command_lock:
+                        self.target_command = {
+                            "joints": np.array(current_joints),
+                            "gripper": self.target_command["gripper"],
+                        }
+                        # Initialize joint history with current position
+                        self.joint_history = [np.array(current_joints)] * self.history_size
+                        print(f"Target command set to current position: {current_joints}")
+                    
+                    # Now start the command thread
+                    self.command_thread = threading.Thread(target=self._robot_thread)
+                    self.command_thread.start()
+                
+                print("Robot is ready and running.")
+                self.initialization_complete = True
+                self.initialization_event.set()  # Signal that initialization is complete
+                break
+
+    def _verify_connection(self) -> bool:
+        """Verify robot connection is working properly"""
+        if self.robot is None:
+            return False
+        
+        try:
+            # Try to get basic robot information
+            version = self.robot.get_version()
+            state = self.robot.get_state()
+            print(f"Robot connection verified. Version: {version}, State: {state}")
+            return True
+        except Exception as e:
+            print(f"Robot connection verification failed: {e}")
+            return False
+
+    def wait_for_initialization(self, timeout=None):
+        """Wait for robot initialization to complete
+        
+        Args:
+            timeout: Maximum time to wait in seconds, or None to wait indefinitely
+            
+        Returns:
+            True if initialization completed, False if timed out
+        """
+        return self.initialization_event.wait(timeout)
+
+    def _emergency_stop_listener(self):
+        """Listen for emergency stop command in a separate thread"""
+        print("Emergency stop listener started. Press 'e' then Enter at any time to emergency stop the robot.")
+        while self.running:
+            try:
+                # Only listen for emergency stop after initialization is complete
+                if not self.initialization_complete:
+                    time.sleep(0.1)  # Wait for initialization to complete
+                    continue
+                
+                # Add a prompt to make it clear this is for emergency controls
+                print("Robot operational. Commands: 'e' = emergency stop, 'q' = quit")
+                user_input = input("Emergency control: ")
+                if user_input.strip().lower() == 'e':
+                    print("EMERGENCY STOP TRIGGERED!")
+                    self.emergency_stop_robot()
+                    break  # Exit the listener after emergency stop
+                elif user_input.strip().lower() == 'q':
+                    print("Shutting down robot...")
+                    self.stop()
+                    break
+                else:
+                    print("Invalid command. Use 'e' for emergency stop or 'q' to quit.")
+            except (EOFError, KeyboardInterrupt):
+                # Handle case where input is interrupted
+                break
+            except Exception as e:
+                print(f"Error in emergency stop listener: {e}")
+                time.sleep(0.1)  # Prevent rapid error loops
+                
+    def emergency_stop_robot(self):
+        """Emergency stop the robot using xArm API built-in function"""
+        if self.robot is not None:
+            try:
+                print("Executing emergency stop...")
+                # Use xArm API's built-in emergency stop function
+                self.robot.emergency_stop()
+                print("Emergency stop executed successfully.")
+                
+                # Set robot to error state
+                self.robot.set_state(state=4)  # Error state
+                
+                # Stop all our threads
+                self.running = False
+                self.locked_after_emergency = True
+                self.monitoring = False  # Stop position monitoring too
+                
+                print("Robot is now in emergency stop state.")
+                print("To recover:")
+                print("  1. Press 'c' then Enter to clear errors and restart")
+                print("  2. Or restart the program manually")
+                print("  3. Or use xArm Studio to clear errors")
+                
+                # Offer recovery option
+                self._emergency_recovery()
+                
+            except Exception as e:
+                print(f"Error during emergency stop: {e}")
+        else:
+            print("Robot is not connected - cannot execute emergency stop.")
+            
+    def _emergency_recovery(self):
+        """Handle recovery after emergency stop"""
+        print("Emergency recovery options:")
+        print("  'c' - Clear errors and restart robot")
+        print("  'q' - Quit without recovery")
+        
+        while True:
+            try:
+                user_input = input("Recovery command: ")
+                if user_input.strip().lower() == 'c':
+                    print("Attempting to clear errors and restart...")
+                    try:
+                        # Clear errors with validation
+                        print("Clearing errors...")
+                        self.robot.clean_error()
+                        self.robot.clean_warn()
+                        time.sleep(1)
+                        
+                        # Check if errors are actually cleared
+                        error_code = self.robot.get_err_warn_code()
+                        if error_code[0] and len(error_code[1]) > 0:
+                            print(f"Warning: Still have error codes: {error_code[1]}")
+                        
+                        # Reset state with validation
+                        print("Resetting robot state...")
+                        ret = self.robot.set_state(state=0)
+                        if ret != 0:
+                            print(f"Warning: Error setting state to 0, code: {ret}")
+                        time.sleep(0.5)
+                        
+                        print("Errors cleared. Moving to home position...")
+                        
+                        # Move to home position (similar to initialization)
+                        self.robot.set_reduced_mode(True)
+                        self.robot.set_reduced_max_joint_speed(0.2)
+                        self.robot.set_reduced_max_tcp_speed(100)
+                        
+                        ret = 0
+                        max_attempts = 100  # Prevent infinite loops
+                        attempt = 0
+                        
+                        while attempt < max_attempts:
+                            current = self.robot.get_servo_angle(is_radian=True)[1]
+                            step = [(t - c) * 0.05 for t, c in zip(self.INITIAL_ANGLES, current)]
+                            next_pos = [c + s for c, s in zip(current, step)]
+                            ret = self.robot.set_servo_angle_j(angles=next_pos, is_radian=True)
+                            if ret != 0:
+                                print(f"Error during recovery movement: {ret}")
+                                self._clear_error_states()
+                                if ret in [1, 9]:  # Common recoverable errors
+                                    attempt += 1
+                                    continue
+                                else:
+                                    break
+                            time.sleep(0.05)
+                            
+                            current = self.robot.get_servo_angle(is_radian=True)[1]
+                            if all(abs(t - c) < self.TOLERANCE for t, c in zip(self.INITIAL_ANGLES, current)):
+                                print("Recovery complete - robot at home position.")
+                                break
+                            attempt += 1
+                        
+                        if attempt >= max_attempts:
+                            print("Warning: Recovery movement may not have completed fully")
+                        
+                        self.robot.set_reduced_mode(False)
+                        
+                        # Reset flags
+                        self.locked_after_emergency = False
+                        self.running = True
+                        
+                        # Restart command thread if needed
+                        if self.command_thread is None or not self.command_thread.is_alive():
+                            current_joints = self.robot.get_servo_angle(is_radian=True)[1]
+                            with self.target_command_lock:
+                                self.target_command = {
+                                    "joints": np.array(current_joints),
+                                    "gripper": self.target_command["gripper"],
+                                }
+                                self.joint_history = [np.array(current_joints)] * self.history_size
+                            
+                            self.command_thread = threading.Thread(target=self._robot_thread)
+                            self.command_thread.daemon = True
+                            self.command_thread.start()
+                            
+                        print("Robot recovery complete and operational.")
+                        break
+                        
+                    except Exception as e:
+                        print(f"Error during recovery: {e}")
+                        print("Recovery failed. Please restart the program or use xArm Studio.")
+                        break
+                        
+                elif user_input.strip().lower() == 'q':
+                    print("Exiting without recovery...")
+                    break
+                else:
+                    print("Invalid command. Press 'c' to clear errors and recover, or 'q' to quit.")
+                    
+            except (EOFError, KeyboardInterrupt):
+                break
+            except Exception as e:
+                print(f"Error in recovery input: {e}")
+                break
 
     def get_state(self) -> RobotState:
         with self.last_state_lock:
             return self.last_state
 
     def set_command(self, joints: np.ndarray, gripper: Optional[float] = None) -> None:
+        if self.locked_after_emergency:
+            if not hasattr(self, "_lock_printed") or not self._lock_printed:
+                print("Robot is locked after emergency stop. Ignoring command.")
+                self._lock_printed = True
+            return
+        self._lock_printed = False
+
         with self.target_command_lock:
             # Add current command to history
             self.joint_history.append(joints)
@@ -370,6 +660,92 @@ class XArmRobot(Robot):
             "gripper_position": np.array(state.gripper_pos()),
         }
     
+    def _boundary_violation_recovery(self, check_interval):
+        """Handle recovery from boundary violation"""
+        while True:
+            try:
+                user_input = input("Recovery command ('r' to recover): ")
+                if user_input.strip().lower() == 'r':
+                    print("Clearing error and resuming...")
+                    # Clear error and enable motion
+                    self.robot.clean_error()
+                    time.sleep(1)
+
+                    print("Moving to home position...")
+                    print(f"Target initial angles: {self.INITIAL_ANGLES}")
+                    self.robot.set_reduced_mode(True)
+                    self.robot.set_reduced_max_joint_speed(0.2)  # rad/s
+                    self.robot.set_reduced_max_tcp_speed(100)     # mm/s
+
+                    # Initialize ret variable
+                    ret = 0
+                    max_attempts = 100
+                    attempt = 0
+                    
+                    while attempt < max_attempts:
+                        current = self.robot.get_servo_angle(is_radian=True)[1]
+                        step = [(t - c) * 0.05 for t, c in zip(self.INITIAL_ANGLES, current)]
+                        next_pos = [c + s for c, s in zip(current, step)]
+                        ret = self.robot.set_servo_angle_j(angles=next_pos, is_radian=True)
+                        if ret != 0:
+                            print(f"Error in set_servo_angle_j during recovery: {ret}")
+                            self._clear_error_states()
+                        time.sleep(0.05)  # Lower frequency → slower motion
+                        
+                        # Check after movement if we've reached the target
+                        current = self.robot.get_servo_angle(is_radian=True)[1]
+                        if all(abs(t - c) < self.TOLERANCE for t, c in zip(self.INITIAL_ANGLES, current)):
+                            print("Target reached.")
+                            break
+                        attempt += 1
+
+                    self.robot.set_reduced_mode(False)
+                    time.sleep(1)
+                    
+                    if ret != 0:
+                        print(f"Error moving to position, code: {ret}")
+                    else:
+                        print("Successfully moved to target position")
+
+                    print("Resuming monitoring.")
+                    self.locked_after_emergency = False
+                    self.joint_history.clear()  # Clear history after emergency stop
+                    time.sleep(1)
+
+                    # Get the current joint angles to ensure command thread starts with correct position
+                    current_joints = self.robot.get_servo_angle(is_radian=True)[1]
+                    with self.target_command_lock:
+                        self.target_command = {
+                            "joints": np.array(current_joints),
+                            "gripper": self.target_command["gripper"],
+                        }
+                        # Reinitialize joint history with current position
+                        self.joint_history = [np.array(current_joints)] * self.history_size
+                    
+                    # Make sure robot is in the right mode before restarting thread
+                    self._clear_error_states()  # Ensure robot is in a clean state
+                    
+                    # Restart the command thread
+                    self.running = True  # Set running flag before starting thread
+                    if self.command_thread is None or not self.command_thread.is_alive():
+                        self.command_thread = threading.Thread(target=self._robot_thread)
+                        self.command_thread.daemon = True
+                        self.command_thread.start()
+                        print("Command thread restarted")
+                    
+                    # Restart monitoring with the same boundaries
+                    self.start_position_monitoring(
+                        x_min=self.boundaries['x_min'], x_max=self.boundaries['x_max'],
+                        y_min=self.boundaries['y_min'], y_max=self.boundaries['y_max'],
+                        z_min=self.boundaries['z_min'], z_max=self.boundaries['z_max'],
+                        check_interval=check_interval
+                    )
+                    return  # Exit this method after restarting monitoring
+                else:
+                    print("Invalid command. Enter 'r' to recover from boundary violation.")
+            except (EOFError, KeyboardInterrupt):
+                break
+
     def start_position_monitoring(self, x_min=None, x_max=None, y_min=None, y_max=None, 
                                 z_min=None, z_max=None, check_interval=0.1):
         """Start continuous position monitoring with custom boundaries"""
@@ -387,42 +763,76 @@ class XArmRobot(Robot):
         }
         
         def monitor_position():
+            consecutive_errors = 0
+            max_consecutive_errors = 5
+            
             while self.monitoring and self.running:
-                if self.robot is not None:
-                    state = self.get_state()
-                    x, y, z = state.cartesian_pos() * 1000  # Convert m to mm
+                try:
+                    if self.robot is not None:
+                        state = self.get_state()
+                        x, y, z = state.cartesian_pos() * 1000  # Convert m to mm
+                        
+                        print(f"Current position: [{x:.2f}, {y:.2f}, {z:.2f}]")
+                        code2, real_angles = self.robot.get_servo_angle(is_real=True)
+                        if code2 == 0:
+                            print("Real-time joint angles:", real_angles)
+                        else:
+                            print(f"Warning: Could not get real-time angles, code: {code2}")
+
+                        # Update recorded max/min
+                        if x > self.recorded_maxmin['x_max']:
+                            self.recorded_maxmin['x_max'] = x
+                        if x < self.recorded_maxmin['x_min']:
+                            self.recorded_maxmin['x_min'] = x
+                        if y > self.recorded_maxmin['y_max']:
+                            self.recorded_maxmin['y_max'] = y
+                        if y < self.recorded_maxmin['y_min']:
+                            self.recorded_maxmin['y_min'] = y
+                        if z > self.recorded_maxmin['z_max']:
+                            self.recorded_maxmin['z_max'] = z
+                        if z < self.recorded_maxmin['z_min']:
+                            self.recorded_maxmin['z_min'] = z
+                        print(f"Recorded max/min: {self.recorded_maxmin}")
+
+                        # Check boundaries
+                        if (x < self.boundaries['x_min'] or x > self.boundaries['x_max'] or
+                            y < self.boundaries['y_min'] or y > self.boundaries['y_max'] or
+                            z < self.boundaries['z_min'] or z > self.boundaries['z_max']):
+                            print(f"EMERGENCY STOP: Position [{x:.2f}, {y:.2f}, {z:.2f}] is outside safe boundaries:")
+                            print(f"Range X: {self.boundaries['x_min']} to {self.boundaries['x_max']}    Current X: {x:.2f}")
+                            print(f"Range Y: {self.boundaries['y_min']} to {self.boundaries['y_max']}    Current Y: {y:.2f}")
+                            print(f"Range Z: {self.boundaries['z_min']} to {self.boundaries['z_max']}    Current Z: {z:.2f}")
+                            
+                            if self.robot is not None:
+                                self.robot.emergency_stop()
+                                self.robot.set_state(state=4)
+                            self.locked_after_emergency = True
+                            self.monitoring = False
+                            self.running = False
+                            
+                            print("Press 'r' then Enter to let robot go home and resume monitoring.")
+                            self._boundary_violation_recovery(check_interval)
+                            return
+                        
+                        # Reset error counter on successful iteration
+                        consecutive_errors = 0
+                        
+                except Exception as e:
+                    consecutive_errors += 1
+                    print(f"Error in position monitoring (attempt {consecutive_errors}): {e}")
                     
-                    print(f"Current position: [{x:.2f}, {y:.2f}, {z:.2f}]")
-
-                    if x > self.recorded_maxmin['x_max']:
-                        self.recorded_maxmin['x_max'] = x
-                    if x < self.recorded_maxmin['x_min']:
-                        self.recorded_maxmin['x_min'] = x
-                    if y > self.recorded_maxmin['y_max']:
-                        self.recorded_maxmin['y_max'] = y
-                    if y < self.recorded_maxmin['y_min']:
-                        self.recorded_maxmin['y_min'] = y
-                    if z > self.recorded_maxmin['z_max']:
-                        self.recorded_maxmin['z_max'] = z
-                    if z < self.recorded_maxmin['z_min']:
-                        self.recorded_maxmin['z_min'] = z
-                    #print(f"Recorded max/min: {self.recorded_maxmin}")
-
-                    if (x < self.boundaries['x_min'] or x > self.boundaries['x_max'] or
-                        y < self.boundaries['y_min'] or y > self.boundaries['y_max'] or
-                        z < self.boundaries['z_min'] or z > self.boundaries['z_max']):
-                        print(f"EMERGENCY STOP: Position [{x:.2f}, {y:.2f}, {z:.2f}] is outside safe boundaries:")
-                        print(f"Range X: {self.boundaries['x_min']} to {self.boundaries['x_max']}    Current X: {x:.2f}")
-                        print(f"Range Y: {self.boundaries['y_min']} to {self.boundaries['y_max']}    Current Y: {y:.2f}")
-                        print(f"Range Z: {self.boundaries['z_min']} to {self.boundaries['z_max']}    Current Z: {z:.2f}")
-
-                        if self.robot is not None:
-                            self.robot.emergency_stop()
+                    if consecutive_errors >= max_consecutive_errors:
+                        print(f"Too many consecutive errors ({consecutive_errors}). Stopping position monitoring.")
                         self.monitoring = False
                         break
+                    
+                    time.sleep(0.5)  # Wait before retrying
+                    continue
+
                 time.sleep(check_interval)
         
         self.monitoring = True
+        self.running = True
         self.monitor_thread = threading.Thread(target=monitor_position)
         self.monitor_thread.daemon = True
         self.monitor_thread.start()

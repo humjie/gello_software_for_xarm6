@@ -38,7 +38,7 @@ class Args:
     gello_port: Optional[str] = None
     mock: bool = False
     use_save_interface: bool = False
-    data_dir: str = "~/gello_software/bc_data"
+    data_dir: str = "~/bc_data"
     bimanual: bool = False
     verbose: bool = False
 
@@ -53,7 +53,34 @@ def main(args):
             # "wrist": ZMQClientCamera(port=args.wrist_camera_port, host=args.hostname),
             # "base": ZMQClientCamera(port=args.base_camera_port, host=args.hostname),
         }
-        robot_client = ZMQClientRobot(port=args.robot_port, host=args.hostname)
+        
+        # Add connection retry logic for robot client
+        max_retries = 10
+        retry_delay = 2.0
+        robot_client = None
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Attempting to connect to robot server (attempt {attempt + 1}/{max_retries})...")
+                robot_client = ZMQClientRobot(port=args.robot_port, host=args.hostname)
+                # Test the connection by trying to get observations
+                test_obs = robot_client.get_observations()
+                print("Successfully connected to robot server!")
+                break
+            except Exception as e:
+                print(f"Connection attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    print("Failed to connect to robot server after all retries.")
+                    print("Make sure launch_nodes.py is running and the robot is initialized.")
+                    return
+        
+        if robot_client is None:
+            print("Could not establish connection to robot server.")
+            return
+            
     env = RobotEnv(robot_client, control_rate_hz=args.hz, camera_dict=camera_clients)
 
     if args.bimanual:
