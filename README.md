@@ -9,7 +9,7 @@ See the GELLO hardware repo for the STL files and hardware instructions for buil
 - Old design for UFactory XArm 6 (Modified based on XArm 7): https://github.com/humjie/gello_software_for_xarm6/tree/main/gello_mechanical/xarm6_old
 - Special new design for UFactory XArm 6: https://github.com/humjie/gello_software_for_xarm6/tree/main/gello_mechanical/xarm6_new
 <p align="center">
-
+  <img src="imgs/xarm6_new_cad.png" width="30%"/>
   <img src="imgs/xarm6_new_printed.jpg" width="60%"/>
 </p>
 ```
