@@ -6,6 +6,7 @@ Original repository by [@wuphilipp](https://github.com/wuphilipp).
 # GELLO
 This is the modified central repo that holds the all the software for GELLO + UFactory xArm6 software. See the website for the paper and other resources for GELLO https://wuphilipp.github.io/gello_site/
 See the GELLO hardware repo for the STL files and hardware instructions for building your own GELLO https://github.com/wuphilipp/gello_mechanical
+- This is a special new design for UFactory XArm 6: 
 ```
 git clone https://github.com/humjie/gello_software_for_xarm6.git
 cd gello_software_for_xarm6
