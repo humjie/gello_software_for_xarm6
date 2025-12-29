@@ -1,0 +1,29 @@
+<mujoco model="xarm_pick_place_scene">
+  <include file="xarm6.xml"/>
+
+  <statistic center="0.3 0 0.4" extent="0.8"/>
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    
+    <geom name="floor" size="2 2 0.05" type="plane" rgba="0.2 0.3 0.4 1"/>
+    
+    <body name="table" pos="0 0 0.045">
+      <geom size="0.8 0.8 0.045" type="box" rgba="0.8 0.8 0.8 1"/>
+    </body>
+
+    <body name="cube" pos="0.6 0 0.135">
+      <freejoint/>
+      <geom name="cube_geom" size="0.04 0.04 0.04" type="box" 
+            rgba="1 0 0 1" mass="0.1" friction="1 0.005 0.0001"
+            contype="1" conaffinity="1" condim="4"/>
+    </body>
+
+    <camera name="top_cam" pos="0.4 0 1.0" mode="fixed" zaxis="0 0 1" fovy="60"/>
+  </worldbody>
+</mujoco>

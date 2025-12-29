@@ -12,10 +12,10 @@ See the GELLO hardware repo for the STL files and hardware instructions for buil
   <img src="imgs/xarm6_new_cadview.png" width="30%"/>
   <img src="imgs/xarm6_new_printed.jpg" width="60%"/>
 </p>
-```
+'''
 git clone https://github.com/humjie/gello_software_for_xarm6.git
 cd gello_software_for_xarm6
-```
+'''
 
 <p align="center">
   <img src="imgs/title.png"/>
@@ -65,9 +65,9 @@ We have created a simple script to automatically detect the joint offset:
 * For the UFactory xArm6 run
 ```
 python scripts/gello_get_offset.py \
-    --start-joints 1.571 3.142 4.712 3.142 0 1.571 \ # in radians
-    --joint-signs 1 1 1 1 1 -1 1 \
-    --port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT7WBG6
+    --start-joints 1.571 3.142 4.712 3.142 0 1.571 \
+    --joint-signs 1 1 1 1 1 1 \
+    --port /dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTAAMN19-if00-port0
 # replace values with your own
 ```
 * Use the known starting joints for `start-joints`.
@@ -140,9 +140,25 @@ To save trajectories with the keyboard, add the following flag `--use-save-inter
 python experiments/run_env.py --agent=gello --use-save-interface
 ```
 
-Data can then be processed using the demo_to_gdict script.
+Install dependencies for data processing.
 ```
-python gello/data_utils/demo_to_gdict.py --source-dir=<source dir location>
+pip install -r requirements_data_process.txt
+```
+
+Collect data in mujoco.
+```
+python gello/data_utils/collect_sim.py
+```
+
+Process the data to diffusion policy usable.
+- Run the raw converter.
+```
+python gello/data_utils/demo_to_gdict_raw.py --source-dir <source dir location>
+```
+
+- Run the merger to turn to final dataset
+```
+python merge_to_diffusion.py --input ~/bc_data/gello/1229_143052/_conv/multiview --output my_training_data.hdf5
 ```
 
 ## Notes

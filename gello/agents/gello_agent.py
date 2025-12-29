@@ -77,6 +77,7 @@ PORT_CONFIG_MAP: Dict[str, DynamixelRobotConfig] = {
         joint_signs=(1, -1, 1, 1, 1, -1),
         gripper_config=(6, 195, 152),
     ),
+    # xarm6
     "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTAAMN19-if00-port0": DynamixelRobotConfig(
         joint_ids=(0, 1, 2, 3, 4, 5),  # 6 arm joints
         joint_offsets=(

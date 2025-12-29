@@ -262,6 +262,7 @@ def main(args):
             elif state == "save":
                 assert save_path is not None, "something went wrong"
                 save_frame(save_path, dt, obs, action)
+                print("Frame saved")
             elif state == "normal":
                 save_path = None
             else:
