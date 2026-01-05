@@ -83,7 +83,7 @@ PORT_CONFIG_MAP: Dict[str, DynamixelRobotConfig] = {
         joint_offsets=(
             4 * np.pi / 2,
             3 * np.pi / 2,
-            0 * np.pi / 2,
+            4 * np.pi / 2,
             1 * np.pi / 2,
             3 * np.pi / 2,
             3 * np.pi / 2,
@@ -141,7 +141,9 @@ class GelloAgent(Agent):
             self._robot = config.make_robot(port=port, start_joints=start_joints)
 
     def act(self, obs: Dict[str, np.ndarray]) -> np.ndarray:
-        return self._robot.get_joint_state()
+        joints = self._robot.get_joint_state()
+        print(f"GELLO output: {joints}")  # Add this line
+        return joints
         """
         print(f"Current joint state: {dyna_joints}")
         if len(dyna_joints) == 6:

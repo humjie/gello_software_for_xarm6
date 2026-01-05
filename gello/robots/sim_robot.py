@@ -256,7 +256,7 @@ class MujocoRobotServer:
                 # mj_step can be replaced with code that also evaluates
                 # a policy and applies a control signal before stepping the physics.
                 self._data.ctrl[:] = self._joint_cmd
-                print("data:", self._data.ctrl)
+                print(f"ctrl[0]={self._data.ctrl[0]:.4f}, qpos[0]={self._data.qpos[0]:.4f}, qvel[0]={self._data.qvel[0]:.4f}")
                 # self._data.qpos[:] = self._joint_cmd
                 mujoco.mj_step(self._model, self._data)
                 self._joint_state = self._data.qpos.copy()[: self._num_joints]
